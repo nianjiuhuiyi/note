@@ -11,6 +11,7 @@
 - [OpenGL](./OpenGL/OpenGL.md/)；
 - [pandas](./pandas/pandas.md)；
 - [PCL点云](./PCL/PCL.md)；
+- [python知识点](./python知识点/README.md)；
 - [tutorial](./tutorial/README.md)；
 - [虚幻引擎UE4](./UE4/README.md)；
 - [数据库](./数据库/README.md)；
