@@ -1,0 +1,2 @@
+neo4j手动开启服务：neo4j start    开启服务后，浏览器进入 http://127.0.0.1:7474/browser/
+关闭服务：neo4j stop

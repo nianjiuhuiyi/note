@@ -1,0 +1,92 @@
+查看显卡信息  !nvidia-smi
+注意，12个小时就会被强制回收一次，记得保存再手动开启
+
+命令前面 加个感叹号就可以调其计算机后台终端，类似于cmd那个，比如 !python
+但是这里的命令是给予liunx系统的，要用他的命令操作(网上百度)
+
+路径都是在  /content/下
+
+使用方法：
+
+1.直接把代码放进去跑，
+适用于一些简单的测试代码
+
+
+2.先创一个文件夹，在里面上传代码项目所有文件，就在这里面鼠标右键创建一个Google Colaboratory
+接着就是在创建好的里面点"代码执行程序"，选择GPU
+
+(1)输入 !nvidia-smi  查看分到的显卡信息
+(2)挂载谷歌云盘 :    （也可以点击左侧文件，然后挂载云盘来挂载）
+from google.colab import drive
+drive.mount("/content/gdrive")  
+运行后点击获取的链接，然后登陆谷歌账号，将获取的东西复制，再回来粘贴回车，出现了Mounted at/content/gdrive就代表ok
+(3)更改运行目录：   （很多使用用 !cd 来切换目录总是有问题，没有反应，然后直接用  cd  就好了，其它命令加 ! ,然后cd就不加了,
+更好的方式还是用 %cd，，因为!cd 可能和 !cmd类似，是会受ipython的魔法方法的影响 ）
+import os
+os.chdir("/content/gdrive/My Drive/ColabDir/自己项目名文件夹名")    #My Drive这个文件夹存在(注意有个空格)，只是看不到，ColabDir是我创建的项目名
+#在ColabDir中上传的整个项目，后面还要记得加你的项目名称哟
+(4)查看目录是否正确
+!pwd    #后端命令，所以加，然后这是linux系统，所以命令是pwd
+(5)执行文件了
+!python name.py
+
+(6)测试图片的展示
+from PIL import Image
+from IPython.display import Image as IMG
+image_path = r"1233"
+display(IMG(image_path))
+
+# 跟上面展示是样的, IPython里更多的用法
+import IPython
+IPython.display.HTML('<iframe width="720" height="405" src="https://www.youtube.com/embed/LWDGR5v3-3o" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>')
+
+# 展示本地的视频文件：
+from IPython.display import HTML
+from base64 import b64encode
+mp4 = open('video.mp4','rb').read()
+data_url = "data:video/mp4;base64," + b64encode(mp4).decode()
+HTML("""
+<video width=400 controls autoplay loop>
+      <source src="%s" type="video/mp4">
+</video>
+""" % data_url)
+
+
+
+# 运行的代码中上传文件，两种方式：（但这都是临时的，关闭后会销毁的，这可以不跟谷歌云盘关联）
+# 一：点击左侧的文件，选择要上传的地方的文件夹的右上角上传 （也可以通过这种方式去下载那些临时文件）
+# 二：通过代码上传，点击运行它会让你上传文件，它会传到你 !pwd 所在的路径
+from google.colab import files
+filename = list(files.upload().keys())[0]
+
+直接再colab中下载别人的googledrive分享的数据链接：（好像现在不行了，获取不到这个id了，好像在别人分享的下载界面有这个id）
+# 首先安装googledrivedownloader
+pip install googledrivedownloader
+#接着下载解压 
+from google_drive_downloader import GoogleDriveDownloader as gdd
+gdd.download_file_from_google_drive(file_id='1uojI7wX5IYBSFBJGpgurTK5ySUXNu9Xv',
+                                    dest_path='./data/faces.zip',
+                                    unzip=True)
+其中file_id='1uojI7wX5IYBSFBJGpgurTK5ySUXNu9Xv'是我在Google云盘文件的分享id，
+比如我的分享链接是https://drive.google.com/open?id=1uojI7wX5IYBSFBJGpgurTK5ySUXNu9Xv，
+则我的id就是file_id='1uojI7wX5IYBSFBJGpgurTK5ySUXNu9Xv'
+
+或者用这个试一下：
+import os
+import gdown
+
+os.makedirs('saves', exist_ok=True)
+print('Downloading propagation model...')
+gdown.download('https://drive.google.com/uc?id=19dfbVDndFkboGLHESi8DGtuxF1B21Nm8', output='saves/propagation_model.pth', quiet=False)
+
+
+
+防止Colab自动掉线：
+按 F12 或者按快捷键ctrl+shift+i，并选择Console，复制以下的代码到控制台中，点击回车即可
+function ClickConnect(){
+console.log("Working");
+document.querySelector("colab-toolbar-button#connect").click()
+}
+var id=setInterval(ClickConnect,5*60000)   //5分钟点一次，改变频率把5换成其他数即可，单位分钟
+//要提前停止，请输入运行以下代码：    clearInterval(id)
+

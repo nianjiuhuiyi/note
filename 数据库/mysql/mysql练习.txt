@@ -1,0 +1,4 @@
+https://blog.csdn.net/original_recipe/article/details/91958663
+
+这是mysql的几个SQL在线刷题网站：
+https://mp.weixin.qq.com/s?__biz=Mzg3MTYyNDkxNA==&mid=2247488321&idx=2&sn=ae663d49b6b3045cd141f8fe5fb77ad0&source=41#wechat_redirect
