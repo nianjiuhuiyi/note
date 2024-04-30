@@ -1,6 +1,6 @@
-- [ffmpeg.md](./ffmpeg.md)；
-- [matplotlib.md](./matplotlib.md)；
-- [numpy.md](./numpy.md)；
-- [PIL.md](./PIL.md)；
-- [sklearn.md](./sklearn.md)；
-- [torch.md](./torch.md)；
+- [ffmpeg](./ffmpeg.md)；
+- [matplotlib](./matplotlib.md)；
+- [numpy](./numpy.md)；
+- [PIL](./PIL.md)；
+- [sklearn](./sklearn.md)；
+- [torch](./torch.md)；
