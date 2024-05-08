@@ -46,7 +46,7 @@ linux:
 
 对应的PotPlayer的一些常用快捷键：
 
-|                                                  |            |
+| 作用                                             | 按键       |
 | ------------------------------------------------ | ---------- |
 | 增加播放速度                                     | C          |
 | 减慢播放毒素                                     | X          |
@@ -91,7 +91,7 @@ linux:
 - -s：设定分辨率   # 可以不要就是原始大小
 - -r：设定帧数
 
-### 片段截取：
+### 片段截取
 
 - 同理视频片段截取（`-t`和`-to`）：
   - `ffmpeg -ss 6 -t 30 -i ./LOL.mp4  temp.mp4`    # 从6秒开始截取30s，存为temp.mp4
@@ -103,7 +103,42 @@ linux:
 
 `ffmpeg -ss 00:00:06 -to 00:10:25 -i ./sample.mp4 -c copy output.mp4`    // -c copy  代表会个各种格式都按照原视频来
 
-## 三、改变码率。(压缩视频)
+### 部分画面截取
+
+ffmpeg -i 01.mp4 -vf crop=200:400:0:120 -threads 4 -preset ultrafast -strict -2 02.mp4
+
+- -vf crop的参数，分表代表，宽，高，起始x，起始y. 起点是视频的左上角；
+- -threads 4：代表四个4核心，设置0，代表能检测到的所有核心，一般不用加这个参数；
+- -preset：来调整编码速度，预设值可以是`ultrafast`、`superfast`、`veryfast`、`faster`、`fast`、`medium`、`slow`、`slower`、`veryslow`或`placebo`。速度越快，CPU使用率越高，但压缩效率可能会降低，也可能会牺牲视频质量。
+
+## 三、压缩视频
+
+说明：这里里西安机芯装配视频来说的，原始视频是用小米11pro用1080p，30fps拍摄，假设为“input.mp4”
+
+- 时长：00:52:23
+- 总比特率：14684kbps
+- 大小：5.37GB
+
+下面用一些方法来压缩视频
+
+### 改变码率
+
+两种方式：
+
+1. 直接使用：ffmpeg -i input.mp4 output.mp4   
+
+   - 压缩后视频码率：4389kbps
+   - 压缩后视频大小：1.60GB
+
+   这就自动降码率了，其它参数还是一样，但可能用压缩后视频去截取骑部分长度的画，截取结果可能会有开头黑屏一两秒的问题。
+
+2. 指定 -crf 参数：ffmpeg -i input.mp4 -crf 20 output.mp4
+
+   - -crf 20：设置CRF值（常量速率因子）。CRF值范围从0（无损）到51（最糟），通常使用18到28的值。较低的CRF值会导致更好的质量，但文件会更大。
+
+---
+
+上面是自动选择的压缩后的码率，下面这是弄动态壁纸的记录：
 
 视频的原码率是 2.1Mb/s ，压缩为 1.5Mb/s
 
@@ -121,22 +156,27 @@ linux:
 
 avi的码率会很大，用这个做动态壁纸会比较吃资源，然后可以直接.avi转成.mp4，它会自己找一个合适和码率去转，不用降低帧率，占用差不多。
 
-## 四、修改编码格式(H.265)，画面大小
+### 改变画面大小、fps、h265编码
 
-> 比如在转格式时，avi转mp4，其它什么都不指定，选择默认：
->
->ffmpeg -i out.avi   123_264.mp4          # 一般码率会比avi减小(但不会特别多)，占用空间减小
->
->ffmpeg -i out.avi  -c:v libx365  123_465.mp4     # 码率会比avi小很多很多(比上面那个还小)，占用的空间也会小很多倍
+ffmpeg -i input.mp4 -c:v libx265 -crf 20 -r 24 -vf scale=1280:-1 -y output.mp4
 
-- `-c:v  libx265`      代表以265的格式编码, -c:v是指定编码器，编码器列表可以使用ffmpeg -codecs查看
+- -c:v libx265：代表以265的格式编码, -c:v是指定编码器，编码器列表可以使用ffmpeg -codecs查看；
 
-还可以直接修改画面的大小：
-ffmpeg -i input.mp4 -c:v libx264 -vf scale=1280:-1 -y out123.mp4
+  - ```
+    比如在转格式时（做动态壁纸时），avi转mp4，其它什么都不指定，选择默认：
+    ffmpeg -i input.avi  out.mp4    # 一般码率会比avi减小(但不会特别多)，占用空间减小
+    ffmpeg -i input.avi  -c:v libx265  out.mp4  # 码率会比avi小很多很多(比上面那个还小)，占用的空间也会小很多倍
+    ```
 
-- -vf scale：指定输出视频的宽高，高-1代表按照比例自动适应,也可以直接 =640:480这样指定一个特定的。
+  - 就这小节里，一样的命令，只是把-c:v从libx265改到了libx264，得到的结果大小是原来的1.45倍，发现主要是因为它总的比特率是原来的1.45倍；所以可能libx265是在画质保持差不多的情况下，比libx264压缩得更狠。 
 
-## 五、声画分离
+- -crf 20：上面提到过了，主要是改变码率；
+
+- -r 24：指定帧率为24，建议跟原视频保持一致，从30到24后，画面看起来偶尔像是会有卡顿；
+
+- -vf scale：指定输出视频的宽高，高-1代表按照比例自动适应,也可以直接 =640:480这样指定一个特定的。上面命令scale=1280:-1就可以将1080p(1920*1080)的视频转成720p(1280\*720)
+
+## 四、声画分离
 
 - 提取音频：`ffmpeg -i input.mp4 -vn -c:a copy output.aac`   # 注意是.aac
   - -vn：表示no video;
@@ -146,7 +186,7 @@ ffmpeg -i input.mp4 -c:v libx264 -vf scale=1280:-1 -y out123.mp4
   - -an：表示no audio；
   - 实例：`ffmpeg -i ./LOL.mp4 -an -vcodec copy 1.mp4` # 原视频是LOL.mp4，会创建一个副本1.mp4
 
-## 六、视频合并
+## 五、视频合并
 
 把要合并的视频放到一个文件夹里，然后把文件名写到txt，像这样：(假设下面就是`merge.txt`的内容)(只能是视频名称不能给绝对路径)
 
@@ -158,7 +198,7 @@ ffmpeg -i input.mp4 -c:v libx264 -vf scale=1280:-1 -y out123.mp4
 
 `ffmpeg -f concat -i merge.txt output.mp4`  看要不要`-c copy`
 
-## 七、音频格式转换
+## 六、音频格式转换
 
 1. MP3、wav之间：
    - mp3转wav：ffmpeg -i 123.mp3 -f wav out.wav   # wav转mp3也是一样
@@ -182,9 +222,3 @@ ffmpeg -i input.mp4 -c:v libx264 -vf scale=1280:-1 -y out123.mp4
 
 wav音频格式转pcm格式的说明：
 [这个](https://blog.csdn.net/u011994171/article/details/88668897)、[这个](https://www.jianshu.com/p/fd43c1c82945)，两个搭配起来看，。然后第转的时候，注意参数的值，可以先用ffprobe example.wav的格式再转
-
-## 八、部分画面截取
-
-ffmpeg -i a.mp4 -vf crop=200:400:0:120 -threads 4 -preset ultrafast -strict -2 b.mp4
-
-- crop的参数，分表代表，宽，高，起始x，起始y. 起点是视频的左上角
