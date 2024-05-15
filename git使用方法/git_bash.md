@@ -22,8 +22,8 @@
 git config --global --list 先查看一下设置了没有。
 
 - 公司：
-  git config user.name "宋辉"
-  git config user.email "songhui@lingyaoai-mail.com"
+  git config user.name "你的名字"
+  git config user.email "你的邮箱"
 - github:
   git config user.name "nianjiuhuiyi"
   git config user.email "nianjiuhuiyi@vip.qq.com"
