@@ -1,4 +1,3 @@
-- [ffmpeg](./ffmpeg.md)；
 - [matplotlib](./matplotlib.md)；
 - [numpy](./numpy.md)；
 - [PIL](./PIL.md)；

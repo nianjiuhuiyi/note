@@ -4,6 +4,7 @@
 - [C++](./C++/README.md)；
 - [docker](./docker/docker.md)；
 - [environment](./environment/README.md)；
+- [FFmpeg](./FFmpeg/README.md)；
 - [git使用方法](./git使用方法/git_bash.md)；
 - [linux](./linux/README.md)；
 - [nginx](./nginx/nginx.md)；
