@@ -227,16 +227,22 @@ linux:
 
    - -r : 就是1秒r张， -r 3 就是1秒3张
 
-   - -f : 指定格式化的格式为image2 
+   - -f : 指定格式化的格式为image2   # 非必须，应该默认就是
 
    生成的结果 image-%4d.jpg    %4d是指4位数字
 
-2. 获取封面：`ffmpeg -i a.mp4 -y -f image2 -frames 1 a.jpg`
-   获取更高质量：`ffmpeg -i a.mp4 -y -f image2 -q:v 2 -frames 1 a.jpg` 
+2. 每一帧都要：`ffmpeg -i input.mp4 -q:v 2 -start_number 0 my_imgs/%05d.jpg`
 
-3. 反过来图成视频就是： ffmpeg -f image2 -i image-%4d.jpg out.mp4
+   - 前面的存放的目录“my_imgs”一定要提前建立；
 
-4. 将多个图转成视频：`ffmpeg -f image2 -r 20 -i  "./images/img_%d.jpg"  ./out.mp4` 
+   -  -start_number 5 就代表从 00005.jpg 开始
+
+3. 获取封面：`ffmpeg -i a.mp4 -y -f image2 -frames 1 a.jpg`
+   获取更高质量：`ffmpeg -i a.mp4 -y -f image2 -q:v 2 -frames 1 a.jpg`   # -q:v就是这个作用
+
+4. 反过来图成视频就是： ffmpeg -f image2 -i image-%4d.jpg out.mp4
+
+5. 将多个图转成视频：`ffmpeg -f image2 -r 20 -i  "./images/img_%d.jpg"  ./out.mp4`   # “images/%5d.jpg”  标注的图
 
    - -r 20：代表帧数设置为20，也可以写做 -framerate 20  是一个意思
    - 还可以加一个参数：-vcodec libx264  # 代表以264格式编码
@@ -256,7 +262,7 @@ linux:
 
 - 时间还可以这么给(从第6秒到第10分25秒)：
 
-`ffmpeg -ss 00:00:06 -to 00:10:25 -i ./sample.mp4 -c copy output.mp4`    // -c copy  代表会个各种格式都按照原视频来，也不用重新编解码，速度快很多。
+`ffmpeg -ss 00:00:06 -to 00:10:25 -i ./sample.mp4 -c copy output.mp4`    // -c copy  代表会个各种格式都按照原视频来，也不用重新编解码，速度快很多，但可能存在win自带软件播放的时候有问题，建议要发给别的话，还是都不要带 -c copy
 
 ---
 
@@ -277,7 +283,7 @@ linux:
 
 #### 3.2.3 视频转gif(片段截取)
 
-视频转gif：`ffmpeg -ss 8 -t 15 -i 11.mp4 -s 600*400 -r 15 res.gif`  # *可以用小写字母x代替
+视频转gif：`ffmpeg -ss 8 -t 15 -i 11.mp4 -s 600x400 -r 15 res.gif`  # *可以用小写字母x代替
 
 - -ss 8 -t 15：从第8秒开始，往后截取15秒钟  
 - -s：设定分辨率   # 可以不要就是原始大小  # 以后使用 -vf "scale=640:-1"  让其自己去算高度，避免图像被拉伸。特别当录的是视频画面很大的时候，一定加上这，不然得到的gif就非常大。
@@ -317,7 +323,7 @@ ffmpeg -i 01.mp4 -vf crop=200:400:0:120 -threads 4 -preset ultrafast -strict -2 
 
 2. 指定 -crf 参数：ffmpeg -i input.mp4 -crf 20 output.mp4
 
-   - -crf 20：设置CRF值（常量速率因子）。CRF值范围从0（无损）到51（最糟），通常使用18到28的值。较低的CRF值会导致更好的质量，但文件会更大。
+   - -crf 20：设置CRF值（常量速率因子）。CRF值范围从0（无损）到51（最糟），通常使用18到28的值,默认值是23。较低的CRF值会导致更好的质量，但文件会更大。
 
 ---
 
@@ -501,7 +507,11 @@ wav音频格式转pcm格式的说明：
 >file  video_4.mp4
 >file  video_5.mp4
 
-`ffmpeg -f concat -i merge.txt output.mp4`  看要不要`-c copy`
+`ffmpeg -f concat -i merge.txt output.mp4`  看要不要`-c copy` 
+
+- 给：一般一下就合并了，不涉及到遍解码，速度很快； # 但不知会不会存在切片那种的问题，即在win上播放时前几秒有问题，只要不加这个，结果在win上播放器又是OK的。 
+- 不给：要重新遍解码，速度比较慢。 # 优势就是结果在win上的播放器一定是OK的，可以考虑先给，结果没问题就行，如果有，再去掉重新生成一次。
+
 或者`ffmpeg -i "concat:1.ts|2.ts|3.ts" -acodec copy -vcodec copy out.mp4`  # 可能会报错，要设置一下编码格式
 
 ### 3.10. 镜面倒影，scale尺寸变换
@@ -510,7 +520,7 @@ wav音频格式转pcm格式的说明：
 这个效果：
 <img src=".\illustration\image-20240808212135489.png" alt="image-20240808212135489" style="zoom:33%;" />
 
-上面教程视频还涉及到：（用到了iw、ih这些变量，是值输入视频的尺寸嘛？）
+上面教程视频还涉及到：（用到了iw、ih这些变量，是值输入视频的尺寸嘛？，应该是的）
 <img src=".\illustration\image-20240808212305421.png" alt="image-20240808212305421" style="zoom:33%;" />
 
 ### 3.11. 画中画，九宫格
@@ -607,3 +617,241 @@ m3u8切片：ffmpeg -i sintel_trailer-480p.webm -fflags flush_packets -max_delay
 
 - ts视频流转mp4：ffmpeg -i test.ts -acodec copy -vcodec copy -f mp4 out.mp4    # -f mp4
 - h264视频转ts视频流：ffmpeg -i temp.h264 -vcodec copy -f mpegts out.ts  # -f mpegts
+
+### 3.15. 屏幕录制
+
+- 全屏录制：ffmpeg -f gdigrab -framerate 30 -i desktop -c:v libx264 -pix_fmt yuv420p -f mp4 out.mp4
+- 区域录制：ffmpeg -f gdigrab -framerate 30 -i desktop -vf crop=640:480:300:200 -c:v libx264 -pix_fmt yuv420p -f mp4 out.mp4
+  - crop=640:480:300:200 ：录屏范围就是从距离左上角x, y为 (300, 200)的位置开始，录制宽高为(640, 480)的画面
+
+---
+
+对应写一个grab.bat脚本，直接全屏录制，并将录制时间设置为文件名，存放在系统的下载目录：（全屏录制）
+
+```bat
+chcp 65001
+
+@echo off
+setlocal
+
+REM 获取当前日期和时间
+for /f "tokens=2 delims==" %%I in ('"wmic os get localdatetime /value"') do set "datetime=%%I"
+REM 提取日期和时间
+set "year=%datetime:~0,4%"
+set "month=%datetime:~4,2%"
+set "day=%datetime:~6,2%"
+set "hour=%datetime:~8,2%"
+set "minute=%datetime:~10,2%"
+set "second=%datetime:~12,2%"
+REM 格式化文件名
+set "filename=%year%-%month%-%day%_%hour%-%minute%-%second%.mp4"
+
+REM 设置录制文件名和保存路径
+set "output_dir=%USERPROFILE%\Downloads"
+
+REM 提示用户选择区域录制
+echo 正在开始全屏录制。英文状态下按 Q 结束录制。
+
+REM 录制全屏
+ffmpeg -f gdigrab -framerate 30 -i desktop -c:v libx264 -pix_fmt yuv420p -f mp4 "%output_dir%\%filename%"
+
+echo 录制已完成，文件保存在 %output_dir%\%filename%
+pause
+```
+
+再写了一个python脚本，用于选取屏幕指定位置进行录制：（区域录制）
+
+- 第一种：用第三方库来捕获事件
+
+  ```python
+  import os
+  import time
+  import subprocess
+   
+  from datetime import datetime
+  from threading import Thread
+  from pynput import mouse  # 涉及到鼠标相关操作信息的捕获，按下、释放的操作，以及操作时的坐标。
+   
+   
+  class Grab:
+      def __init__(self):
+          self.click_start = None
+          self.click_end = None
+          self.listen_thread = Thread(target=self._listen_mouse_thread, daemon=True)
+   
+      def _on_click(self, x, y, button, pressed):
+          if button != mouse.Button.left:
+              return
+          # 按下鼠标左键
+          if pressed:
+              self.click_start = (x, y)
+          # 松开鼠标左键
+          else:
+              self.click_end = (x, y)
+       
+      def _listen_mouse_thread(self):
+          with mouse.Listener(on_click=self._on_click) as listener:
+              listener.join()
+   
+      def _record(self):
+          now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+          file_name = now + ".mp4"
+          save_path = os.environ.get("USERPROFILE")
+          save_file_path = os.path.join(save_path, "Downloads", file_name)
+   
+          # 确保从右下往左上画框也是OK的
+          w = abs(self.click_end[0] - self.click_start[0])
+          h = abs(self.click_end[1] - self.click_start[1])
+          # 录制的宽高必须为偶数
+          if w % 2 != 0:
+              w -= 1
+          if h % 2 != 0:
+              h -= 1
+   
+          # 起始点
+          x = max(0, min(self.click_start[0], self.click_end[0]))
+          y = max(0, min(self.click_start[1], self.click_end[1]))
+          print(w, h , x ,y )
+   
+          # ffmpeg -f gdigrab -framerate 30 -i desktop -vf crop=640:480:300:200  -c:v libx264 -pix_fmt yuv420p -f mp4 "保存地址"
+          process = subprocess.Popen(['ffmpeg',
+                                      '-f', 'gdigrab',
+                                      '-framerate', '30',
+                                      '-i', 'desktop',
+                                      '-vf', f'crop={w}:{h}:{x}:{y}',
+                                      '-c:v', 'libx264',
+                                      '-pix_fmt', 'yuv420p',
+                                      '-f', 'mp4',
+                                      save_file_path])
+          process.wait()
+          print("\n录制已完成，文件保存在: ", save_file_path)
+                   
+      def run(self):
+          if os.system("where ffmpeg > nul 2>&1") != 0:
+              print("找不到FFmpeg，请检查是否将其加入到系统环境变量中...")
+              os.system("pause")
+              return
+   
+          self.listen_thread.start()
+          print("请矩形框选要录制的区域...")
+          print("录制开始后，点击终端聚焦后，在英文状态下按Q停止录制...")
+          while True:
+              if self.click_start and self.click_end and self.click_start != self.click_end:
+                  self._record()
+                  os.system("pause")
+                  return
+              else:
+                  time.sleep(0.1)
+   
+  if __name__ == '__main__':
+      grab = Grab()
+      grab.run()
+  ```
+
+- 第二种：用python的tkinter库，好多了，还能在框选时把屏幕变灰并固定起来,以方便框选
+
+  ```python
+  import os
+  import subprocess
+  
+  import tkinter as tk
+  from datetime import datetime
+  
+  
+  class Grab:
+      def __init__(self):
+          self.root = tk.Tk()
+          self._set_attribute()
+  
+          # 灰色背景的画布
+          self.canvas = tk.Canvas(self.root, bg="gray")
+          self.canvas.pack(fill=tk.BOTH, expand=True)
+  
+          self.rect = None
+          self.x1 = 0
+          self.y1 = 0
+          self.x2 = 0
+          self.y2 = 0
+  
+      def _set_attribute(self):
+          self.root.attributes('-fullscreen', True)
+          self.root.attributes('-alpha', 0.5)  # 背景透明度
+  
+          self.root.bind("<ButtonPress-1>", self._on_button_press)
+          self.root.bind("<B1-Motion>", self._on_mouse_drag)
+          self.root.bind("<ButtonRelease-1>", self._on_button_release)
+  
+      def _on_button_press(self, event):
+          self.x1 = event.x
+          self.y1 = event.y
+          self.rect = self.canvas.create_rectangle(self.x1, self.y1, self.x1, self.y1, outline="red", width=2)
+  
+      def _on_button_release(self, event):
+          self.x2 = event.x
+          self.y2 = event.y
+          # # 松开时就可以把背景删了
+          self.canvas.delete(self.rect)
+          self.root.destroy()
+  
+          # 这里就可以开始录屏了
+          self._record()
+  
+      def _on_mouse_drag(self, event):
+          self.x2 = event.x
+          self.y2 = event.y
+          self.canvas.coords(self.rect, self.x1, self.y1, self.x2, self.y2)
+  
+          # 方式一：框选过程中，填充一个颜色
+          self.canvas.create_rectangle(self.x1, self.y1, self.x2, self.y2, fill="red", outline='', stipple="gray50")
+  
+      def _record(self):
+          now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+          file_name = now + ".mp4"
+          save_path = os.environ.get("USERPROFILE")
+          save_file_path = os.path.join(save_path, "Downloads", file_name)
+  
+          # 起始点
+          x = max(0, min(self.x1, self.x2))
+          y = max(0, min(self.y1, self.y2))
+          # 确保从右下往左上画框也是OK的
+          w = abs(self.x2 - self.x1)
+          h = abs(self.y2 - self.y1)
+  
+          # 录制的宽高必须为偶数
+          if w % 2 != 0:
+              w -= 1
+          if h % 2 != 0:
+              h -= 1
+  
+          # ffmpeg -f gdigrab -framerate 30 -i desktop -vf crop=640:480:300:200  -c:v libx264 -pix_fmt yuv420p -f mp4 "保存地址"
+          ffmpeg_process = subprocess.Popen(['ffmpeg',
+                                      '-f', 'gdigrab',
+                                      '-framerate', '30',
+                                      '-i', 'desktop',
+                                      '-vf', f'crop={w}:{h}:{x}:{y}',
+                                      '-c:v', 'libx264',
+                                      '-pix_fmt', 'yuv420p',
+                                      '-f', 'mp4',
+                                      save_file_path])
+          ffmpeg_process.wait()
+          print("\n录制已完成，文件保存在: ", save_file_path)
+  
+      def run(self):
+          if os.system("where ffmpeg > nul 2>&1") != 0:
+              print("找不到FFmpeg，请检查是否将其加入到系统环境变量中...")
+              os.system("pause")
+              return
+  
+          self.root.mainloop()
+  
+  
+  if __name__ == '__main__':
+      grab = Grab()
+      grab.run()
+  ```
+
+说明：
+
+- 可以把这些脚本打包添加进环境变量，这样就可以直接cmd或是命令行里面快速启动；
+- 或是把脚本添加创建快捷方式，把这快捷方式放进win开始的那些快捷方式的路径里，快捷方式属性里设置一个类似F3这块的快捷键，然后就可以一键启动；
+- 问题：区域录制开始要选取区域，但是鼠标点到窗口时会拖动窗口，所以改进应该是选取窗口时要把当前整个屏幕截取并置顶，在此基础上再选取区域。

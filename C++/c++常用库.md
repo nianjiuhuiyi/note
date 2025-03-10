@@ -886,7 +886,7 @@ int main(int argc, char* argv[]) {
     ```
 
     用postman的请求示例：
-    <img src="illustration/image-20250227133935464.png" alt="image-20250227133935464" style="zoom: 67%;" />
+    ![](./illustration/image-20250227133935464.png)
 
 ### CppNet
 
@@ -1071,5 +1071,5 @@ TEST_CASE("test the error", "the func()") {
   }
   ```
   
-  - default_config.yaml像这样：（注意啊给的字符串这些都不要加引号）   
-    <img src="C:\Users\Administrator\OneDrive\文档\note\C++\illustration\image-20240730103116630.png" alt="image-20240730103116630" style="zoom:50%;" />
+  - default_config.yaml像这样：（注意啊给的字符串这些都不要加引号） 
+    ![](./illustration/image-20240730103116630.png) 
