@@ -91,8 +91,6 @@ int main(int argc, char* argv[]) {
     std::vector<int> v1{1, 2, 3};
     std::vector<int> v2 = {1, 2, 3};
 
-    std::map<int, std::string> m1{{0, "car"}, {1, "cpu"}};
-    std::map<int, std::string> m2 = {{0, "car"}, {1, "cpu"}};
     return 0;
 }
 ```
@@ -869,7 +867,7 @@ if (std::shared_ptr<int> np = wp.lock()) {  // np不为空条件才成立
 
 初始化动态分配对象的数组：
 
-> - int *pia1 = new int[10];                    // 10个未初始化的int
+> - int *pi = new int[10];                    // 10个未初始化的int
 > - int *pia2 = new int[10]\();                  // 10个初始值为0的int
 > - std::string *psa = new std::string[10];      // 10个空string  
 > - std::string *psa2 = new std::string[10]\();   // 10个空string  
