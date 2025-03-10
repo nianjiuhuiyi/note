@@ -8,3 +8,6 @@
 - [GCC编译器](./GCC编译器.md)；
 - [visual studio使用](./visual studio使用.md)；
 - [VSCode的c++开发](./VSCode的c++开发.md)；
+
+注意：笔记中的，凡是有紧挨着的**双花括号**“{”的那行，都要给删除了，不然构建pages时会解析失败。like this：
+![image-20250310154623540](illustration/image-20250310154623540.png)
