@@ -119,6 +119,8 @@
   - 安装完后，直接再执行上面的编译命令g++ main.cpp -o main，会得到一堆“`undefined reference to`”的错误，这是因为并没有指定库。
   - 最终解决：g++ main.cpp -l ncurses -o main    // 一定要指定-l ncurses，或写一起-lncurses
     - 故：很多时候我们库安装好了，使用命令行编译，不会报找不到头文件的错了，但是会得到第二个错误 ，就是没有指定库，急着这个原因，出现好多次了。
+  
+- linux下如果用了多线程，编译时要在后面加上 lpthread, 可能就是这样 g++ main.cpp -lpthread
 
 #### 1.2.4 -I
 
@@ -231,10 +233,10 @@ cd ..
 g++ main.cpp -lswap -Lsrc -Imyinclude -o dynamic_main
 ```
 
-- -fPIC：代表说与路径无关(不是很懂)
+- -fPIC：代表说与路径无关(不是很懂,可看[这篇](https://zhuanlan.zhihu.com/p/709969977)解释)
 - -shared：说明是要生成动态库文件
 
-#### 1.4.3.总结
+#### 1.4.3 ==静动态库总结== 
 
 1. 最后一步链接参数解读：需要链接库文件，所以直接`-lswap`,库文件的路径`-Lsrc`,它的头文件在`-Imyinclude`，一定要结合上面的g++编译参数来看；
 
@@ -245,9 +247,56 @@ g++ main.cpp -lswap -Lsrc -Imyinclude -o dynamic_main
 4. 静态库生成对的`static_main`是可以直接就执行的，然而执行`dynamic_main`时，就会报找不到`libswap.so`动态库的错误，这是因为这个动态库不在那系统三个路径下，找不到，就需要我们手动添加一下,那运行就是：
 
    - 静态库：`./static_main`
+   - 动态库：`LD_LIBRARY_PATH=src ./dynamic_main`   # 注意这是一条命令
 
-   - 动态库：`LD_LIBRARY_PATH=src ./dynamic_main` 
-     - 注意这是一条命令
+---
+
+下面再以yaml-cpp这个库做个说明（当涉及到静态库时，一般用在linux下，win可能有问题）：
+
+环境准备：（关于生成动态库还是静态库，[yaml-cpp](https://github.com/jbeder/yaml-cpp)这个项目很有参考学习意义）
+
+- yaml-cpp编译动态库：cmake命令中加入`-DYAML_BUILD_SHARED_LIBS=ON`，然后得到“libyaml-cpp.so”
+
+- yaml-cpp编译静态库：cmake .. ，直接得到“libyaml-cpp.a”   # 主要是它源码中的CMakeLists.txt默认生成静态库。
+
+- 此时假设静动态库都放一起，/opt/yaml-cpp/中内容如下：
+
+  > yaml-cpp/
+  > ├── include
+  > │   └── yaml-cpp
+  > │       ├── anchor.h
+  > │       ├── ...
+  > └── lib
+  >     ├── libyaml-cpp.a      # 静态库
+  >     └── libyaml-cpp.so     # 动态库
+
+项目用的CMakeLists.txt
+
+```cmake
+cmake_minimum_required(VERSION 3.11)
+project(demo)
+
+set(CMAKE_BUILD_TYPE "Debug")
+
+# Enable C++11
+set(CMAKE_CXX_STANDARD 11)   # 有的只要了这一句
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)  # 尽量都要，不然有时会因为这出问题
+
+include_directories(/opt/yaml-cpp/include)
+link_directories(/opt/yaml-cpp/lib)
+
+add_executable(main main.cpp)
+target_link_libraries(main yaml-cpp)  # 这会默认使用动态库
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/coco.yaml DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/) 
+# file(COPY ${YAML_CPP_DIR}/bin/yaml-cppd.dll DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)   # 不添加环境变量的话，就要把动态库复制过去
+```
+
+注：
+
+- 给的路径中，动态库、静态库都有，==默认优先使用动态库==，如果main文件要运行成功，必须要把“/opt/yaml-cpp/lib”添加进动态库环境变量或者把libyaml-cpp.so复制到main运行文件所在路径。此时因为是用的动态库，main整体会小一下。
+- 指定使用静态库，则“target_link_libraries(main yaml-cpp.a)”，就是把静态库名字写全(非必须)，CMakeLists.txt其它都不用变，这样打包出来的main文件就可以直接运行，静态库已经打包进去了，不用设置路径，就很方便。
+- ==总结==：当一些比较小的库，特别涉及到交叉编译的，干脆直接将其先预编译成静态库，然后直接链接静态库，这样就不用将这动态库复制到AI盒子上，还要去添加动态库路径，执行文件大一点而已。但一些很大的库，就还是使用动态库吧。
 
 ##  二、GDB调试
 
@@ -348,6 +397,112 @@ pdb.set_trace()    # 直接把这行放在想要调试的代码前
 方式三、
 
 这是终端输入参数的调试方法：[VSCode的c++开发.md](./VSCode的c++开发.md)中的最底部位置。
+
+### 2.5 调试coredump文件
+
+我暂时还是临时启用吧，直接看最下面的示例脚本run.sh。
+
+​	2.2、2.3都是重新开始运行执行程序进行调试，那下面讲的这种是正常运行的程序发生错误后，利用gdb来调试错误发生时生成的快照文件coredump来分析错误原因。（一般要debug的程序才能这样调试，release的文件很可能都没这些信息）
+
+准备：
+
+1. 允许linux系统生成coredump文件：
+
+   - 在一个新系统上，命令查看`ulimit -a`会得到类似这样的结果
+
+     > core file size          (blocks, -c) 0                # 这就代表不生成，因为它是0
+     > data seg size           (kbytes, -d) unlimited
+     > ...
+
+   - 允许生成：
+
+     - 终端执行这个命令就好了: `ulimit -c unlimited`  # 要永久生效，就把这行写进配置文件里
+     - 然后再去用  ulimit -a 取查看，就会发现第一行不再是0，而是 unlimited 的了
+
+2. 设置coredump的保存路径和格式：（建议自己养成习惯都放/var/crash这里吧）
+
+   - vim /etc/sysctl.conf  最后一行加入 kernel.core_pattern = /var/crash/core_%e.%p.%t.%s
+     注：如果要保存到其它路径，一定要先去生成这个路径，如果路径不存在，coredump是不会自动生成，也就找不到
+   - 得到的结果可能就是这样： “core_!home!songhui!123!a.out.26050.1722402332.11”
+   - 格式中的参数含义：（可根据自己的情况选择部分）
+     - %e  程序文件的完整路径 # 注：路径中的/会被!替代
+     - %p  进程Id
+     - %t  进程崩溃的时间戳
+     - %s  哪个信号让进程崩溃
+
+3. 让配置生效：sysctl -p /etc/sysctl.conf
+
+---
+
+一个Demo：
+
+1. 准备一个测试文件main.cpp：
+
+   ```c++
+   #include <thread>
+   
+   int main() {
+       std::this_thread::sleep_for(std::chrono::hours(1));
+       return 0;
+   }
+   ```
+
+2. 人为触发生成coredump：
+
+   ```shell
+   g++ main.cpp  -g -o demo        # 我这里加了 -std=c++11 标识后，下面bt打印的堆栈看不出来，注意这点
+   ./demo &         # 让其后台运行（回车后会得到它的PID, 就是下面这行）
+   [1] 27273         
+   kill -s SIGSEGV 27273   # 这样会让其生成coredump文件，这是断信号，但注意 kill -9 这种去杀进程不会生成
+   ```
+
+   这步结束后，就会生成一个文件：/var/crash/core_!home!songhui!123!demo.27273.1722403609.11
+
+3. gdb查看coredump文件产生的原因：gdb binaryFile coredumpFile
+
+   ```
+   gdb demo /var/crash/core_!home!songhui!123!demo.27273.1722403609.11     # 尽量让其自动补充，因为!需要转义符
+   # 这就会进到gdb界面
+   (gdb) bt         # 这是查看堆栈(如果没有这样类似的形式，注意是不是加了-std=c++11,或是没有-g)。下面能看出来是 sleep_for出了问题
+   #0  0x00007f687137c9e0 in __nanosleep_nocancel () from /lib64/libc.so.6
+   #1  0x00000000004008d7 in std::this_thread::sleep_for<long, std::ratio<3600l, 1l> > (__rtime=...)
+       at /opt/rh/devtoolset-8/root/usr/include/c++/8/thread:379
+   #2  0x00000000004005c0 in main () at main.cpp:4
+   (gdb) f 2      # f 是命令，2 上面堆栈信息的 #2 ，看到说是这行代码出了问题，然后就这个命令跳到这里
+   #2  0x00000000004005c0 in main () at main.cpp:4
+   4	    std::this_thread::sleep_for(std::chrono::hours(1));
+   (gdb) l     # 这就会把问题码位置的上下一些代码显示出来
+   1	#include <thread>
+   2	
+   3	int main() {
+   4	    std::this_thread::sleep_for(std::chrono::hours(1));
+   5	    return 0;
+   6	}
+   (gdb) q   # 退出
+   [1]+  Segmentation fault      (core dumped) ./demo
+   ```
+
+如此的coredump文件都是生产成在上面指定的 /var/crash/ 文件夹中，如果要生成在当前执行文件的路径中，可以用一个脚本：
+
+run.sh
+
+```bash
+#!/bin/bash
+
+# 获取可执行文件的路径
+EXEC_PATH=$(dirname $(realpath $0))
+
+# 设置coredump文件名格式，包含可执行文件路径
+sudo sysctl -w kernel.core_pattern="$EXEC_PATH/core.%e.%p"
+
+# 启用core dump
+ulimit -c unlimited
+
+# 执行程序
+./my_program
+```
+
+
 
 ## 三、make
 
@@ -584,6 +739,7 @@ Tips：
 |  CMAKE_CURRENT_LIST_DIR   |          当前处理的CMakeList.txt文件所在目录的路径           |
 |   CMAKE_INSTALL_PREFIX    |            指定`make install`命令执行时包安装路径            |
 |     CMAKE_MODULE_PATH     |          `find_package`命令搜索包路径之一，默认为空          |
+|     CMAKE_SYSTEM_NAME     |     可以用`${CMAKE_SYSTEM_NAME}`来回去当前编译的系统名字     |
 
 编译配置相关变量，一般都需要set去显示指定：
 
@@ -594,10 +750,12 @@ Tips：
 |   CMAKE_CXX_STANDARD   | 也可以设置C++11编译，`set(CMAKE_CXX_STANDARD 11)` （用上面的方式） |
 |    CMAKE_CXX_FLAGS     | `set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -std=c++11")`，g++编译选项，在后面追加-std=c++1再覆盖 |
 |     CMAKE_C_FLAGS      |           gcc编译选项，也是一样在后面追加编译选项            |
-|    CMAKE_C_COMPILER    |                         指定C编译器                          |
-|   CMAKE_CXX_COMPILER   |                        指定C++编译器                         |
+|    CMAKE_C_COMPILER    | 指定C编译器 # set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)  # 交叉编译，等价环境变量中写`export CC=aarch64-linux-gnu-gcc`  # 但一定要 which aarch64-linux-gnu-gcc 找得到，否则得写完整路径 |
+|   CMAKE_CXX_COMPILER   | 指定C++编译器 # set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)  # |
 | EXECUTABLE_OUTPUT_PATH |                   可执行文件输出的存放路径                   |
 |  LIBRARY_OUTPUT_PATH   |                     库文件输出的存放路径                     |
+
+- 注：还是用export CXX=aarch64-linux-gnu-g++ 这样的方式先指定环境。用上表写在CMakeLists.txt的CMAKE_CXX_COMPILER变量可能不起作用
 
 判断操作系统
 
@@ -677,6 +835,23 @@ endif()
   
   project()函数将创建一个值为hello_cmake的变量${PROJECT_NAME}
 
+特别注意,如果涉及到交叉编译，一定要写成：`project(myName LANGUAGES CXX)`  后面一定要加这个，然后cmake在顶层还要指定`-DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++`，不然如果这个项目是一个子项目，没这样子指定，只在顶层CMakeLists.txt指定了，一定会报类似于这样的错误：（设置了环境变量的，设置全路径也不行，只能在cmake时指定，且一定要写成 project(ARGS_PROJECT LANGUAGES CXX)，后面要跟这）
+
+```
+CMake Error at 3rdparty/args/CMakeLists.txt:3 (project):
+  The CMAKE_C_COMPILER:
+
+    aarch64-linux-gnu-gcc
+
+  is not a full path and was not found in the PATH.
+
+  Tell CMake where to find the compiler by setting either the environment
+  variable "CC" or the CMake cache entry CMAKE_C_COMPILER to the full path to
+  the compiler, or to the compiler name if it is in the PATH.
+```
+
+
+
 #### 4.2.3 set() | file()
 
 含义：显示地定义变量,创建的变量名可以方便后续直接使用
@@ -689,7 +864,7 @@ endif()
 # 方式1：
 set(SOURCE src/Hello.cpp src/main.cpp)   # 顺序是没有关系的
 
-# 方式2，用GLOB+通配符
+# 方式2，用GLOB+通配符 (tensorrtx项目中还看到了用的 GLOB_RECURSE )
 file(GLOB SOURCE "src/*.cpp")
 
 # 语法：add_executable(exename source1 source2...) ---> add_executable(my_main 1.cpp 2.cpp...)这是是要所有的cpp源文件
@@ -714,7 +889,8 @@ Tips:
 
   ```cmake
   # 定义一个SRC变量，其值为当前目录下所有的源代码文件
-  aux_source_directory(. SRC)
+  aux_source_directory(. SRC)  # 默认开始路径就是${CMAKE_SOURCE_DIR}，所以加不加这无所谓，是CmakeListst.txt开始的相对路径
+  aux_source_directory(../src/ SRC)   # 这样会把这两个地方的源码都放这变量里面去
   # 编译SRC变量所代表的源代码文件，生成main可执行文件
   add_executable(main ${SRC})
   ```
@@ -817,7 +993,7 @@ target_link_libraries(hello_main PRIVATE hello::library)
 
 #### 4.2.6 install() | -DCMAKE_INSTALL_PREFIX
 
-​	CMake是可以控制这些生成的头文件、二进制文件、库文件被安装在哪里，命令是`make install`，是由`install()`函数控制的:
+​	CMake是可以控制这些生成的头文件、二进制文件、库文件被安装在哪里，命令是`make install`，是由`install()`函数控制的:（==如果cmake时没有指定-DCMAKE_INSTALL_PREFIX，然后已经生成了Makefile，应该用 `make install PREFIX=/opt/你的路径`来指定安装路径==）
 
 这是基于上一个例子,目录结构：
 
@@ -856,9 +1032,14 @@ install(TARGETS ${install_library} DESTINATION lib)  # 库可能很多个，起�
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/ DESTINATION include)
 # DIRECTORY也是固定写法；结合上面tree结果看，这回把include目录下的installing目录都放进去
 
-# (4)Config (要有这文件才写)
+# (4)Config (要有这文件才写)（这种不会给文件添加权限）
 install(FILES cmake-examples.conf DESTINATION etc)
 # FILES也是固定写法；会生成名为cmake-examples.conf的文件在目标路径的etc下
+
+#-------------扩展：install 是要在执行 make install 后 才会去复制的，还有个可以直接在 make 执行后就复制----------
+# 这是是 yaml-cpp中的CMakeListst.txt中看到的
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/coco.yaml DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/) # 要用的配置文件这些
+file(COPY ${YAML_CPP_DIR}/bin/yaml-cppd.dll DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)   # 不添加环境变量的话，就要把动态库复制过去
 ```
 
 在window上可能有点不一样，是要用：
@@ -869,9 +1050,13 @@ install (TARGETS install_library
     RUNTIME DESTINATION bin)
 ```
 
-再注意：install安装可是当复制文件用的，可是是复制可执行文件、复制文件、文件夹、库这些是有不同的区别的，具体看[这里](https://blog.csdn.net/qq_38410730/article/details/102837401)，写的很详细。
+再注意：install安装可是当复制文件用的，可以是复制可执行文件、复制文件、文件夹、库这些是有不同的区别的，具体看[这里](https://blog.csdn.net/qq_38410730/article/details/102837401)，写的很详细。
 
 ​	就按照自己写learnOpenGL的实战demo来看，有install(TARGETS|PROGRAMS|FILE|DIRECTORY)
+
+- install(PROGRAMS resources/run.sh DESTINATION ./)  # 会给复制后的run.sh添加可执行权限（指的是非目标文件的可执行程序）
+- install(FILES resources/config.yaml DESTINATION etc)  # 这种就可以只是复制，而不添加权限
+- install(DIRECTORY resources DESTINATION ./)  # 这种会复制resources整个文件夹
 
 ```cmake
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -1291,11 +1476,11 @@ add_subdirectory(subbinary)
 project (sublibrary2)
 
 add_library(${PROJECT_NAME} INTERFACE)      # INTERFACE这是固定写法
-add_library(sub::lib2 ALIAS ${PROJECT_NAME})  # 上面一行是生成库名，这行是在取别名
+add_library(sub::lib2 ALIAS ${PROJECT_NAME})  # 上面一行是生成库名，这行是在取别名（直接叫 lib2也是OK的）
 
 target_include_directories(${PROJECT_NAME}
     INTERFACE
-        ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/include
 )
 ```
 
@@ -1308,14 +1493,14 @@ project (sublibrary1)
 
 # 源文件和头文件都有的写法就是这样
 add_library(${PROJECT_NAME} src/sublib1.cpp)   # 把源文件生成库文件
-add_library(sub::lib1 ALIAS ${PROJECT_NAME})   # 同样也给取了一个别名
+add_library(sub::lib1 ALIAS ${PROJECT_NAME})   # 同样也给取了一个别名（直接叫 lib1也是OK的）
 
 target_include_directories( ${PROJECT_NAME}
     PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
 ```
 
-（4）、执行文件subbinary中的CMakeLists.txt：
+（4）、执行文件subbinary中的CMakeLists.txt：（一般是顶层的CMakeLists.txt）
 
 ```cmake
 project(subbinary)
@@ -1332,7 +1517,7 @@ target_link_libraries(${PROJECT_NAME}
 
 Tips：
 
-- 从cmake-v3开始，生成二进制文件，链接库文件时，不需要再添加项目的include directories，这是在创建库文件时，这由target_include_directories()命令范围控制，在这里subbinary可执行文件链接了sublibrary1和sublibrary2库，它会自动包含\${sublibrary1_SOURCE_DIR}/inc和${sublibrary2_SOURCE_DIR}/inc文件夹，因为它们是和库的PUBLIC和INTERFACE作用域一起导出的；
+- 从cmake-v3开始，生成二进制文件，链接库文件时，不需要再添加项目的include_directories，这是在创建库文件时，这由target_include_directories()命令范围控制，在这里subbinary可执行文件链接了sublibrary1和sublibrary2库，它会自动包含\${sublibrary1_SOURCE_DIR}/inc和${sublibrary2_SOURCE_DIR}/inc文件夹，因为它们是和库的PUBLIC和INTERFACE作用域一起导出的；
 
 - 如果库文件创建了一个库，那其它项目可以通过`target_link_libraries()`命令中的项目名称来引用，意味着不必引用新库的完整路径，它是作为依赖添加的，像这样：
 
@@ -1357,6 +1542,58 @@ CMakeLists.txt中有这么一句：
 > endif()
 
 然后若是需要启用opencv，就在cmake时加上参数：cmake -DTNN_DEMO_WITH_WEBCAM=ON
+
+#### 4.2.13 add_definitions
+
+通过cmake来控制代码功能是开启还是不开启，或是选择A还是选择B，
+
+一般是写在CMakeLists.txt中，下面的是rk3588中的示例
+
+```cmake
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  include_directories(${ZLMEDIAKIT_PATH}/include)
+  set(ZLMEDIAKIT_LIBS ${ZLMEDIAKIT_PATH}/${LIB_ARCH}/libmk_api.so)
+endif()
+
+if(ZLMEDIAKIT_LIBS)
+  add_definitions(-DBUILD_VIDEO_RTSP)      # 注意这里，“BUILD_VIDEO_RTSP” 就是我们的标志，-D是同cmake命令行的
+endif()
+```
+
+然后再main.cpp里就可以用：
+
+```c++
+#include <iostream>
+// 写作 #ifdef BUILD_VIDEO_RTSP    // 也是ok的，应该是两种写法
+#if defined(BUILD_VIDEO_RTSP)        // 这就是是那个CMakeLists.txt中的定义，
+#include "mk_mediakit.h"
+#endif
+
+#if defined(BUILD_VIDEO_RTSP)
+void API_CALL on_track_frame_out(void *user_data, mk_frame frame) {/* do something */}
+void API_CALL on_mk_play_event_func(void *user_data, int err_code, const char *err_msg, mk_track tracks[]) {/**/}
+int process_video_rtsp(rknn_app_context_t *ctx, const char *url) {
+    on_track_frame_out();
+    on_mk_play_event_func();       // 只是示意
+}
+#endif
+
+int main() {
+	if (strncmp(video_name, "rtsp", 4) == 0) {
+#if defined(BUILD_VIDEO_RTSP)
+    process_video_rtsp(&app_ctx, video_name);
+#else
+    printf("rtsp no support\n");
+#endif
+  }
+  else {
+    process_video_file(&app_ctx, video_name);
+  }
+	return 0;
+}
+```
+
+
 
 ### 4.3 进阶其它
 
@@ -1407,7 +1644,7 @@ cmake_minimum_required(VERSION 3.1)
 
 # Enable C++11
 set(CMAKE_CXX_STANDARD 11)   # 有的只要了这一句
-set(CMAKE_CXX_STANDARD_REQUIRED TRUE)  # 尽量都要，不然有时会因为这出问题
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)  # 尽量都要，这代表不支持c++11就会报错，不然有时会因为这出问题
 
 # Define project name
 project(opencv_example_project)
@@ -1539,7 +1776,7 @@ Tips：有的项目，坐着都会提供一个Dockerfile文件，里面可能会
 
 同时看到一个衍生问题：直接添加库的对应函数是link_libraries(),把所有库添加进去就好了，注意，这不需要我们手动添加.lib后缀了（这个还没试验过）
 
-#### 4.4.2 第三方库路径设置
+#### 4.4.2 ==第三方库路径设置==
 
 一般要用的一个第三方库，如果它有XXXConfig.cmake
 
@@ -1819,6 +2056,73 @@ cpp-httplib这个项目的[cmake](https://github.com/yhirose/cpp-httplib/blob/ma
 	FindPython3 requires Cmake v3.12
 	ARCH_INDEPENDENT option of write_basic_package_version_file() requires Cmake v3.14
 ]]
+
 cmake_minimum_required(VERSION 3.14.0 FATAL_ERROR)
 ```
+
+### 4.11 FetchContent 
+
+这是cmake3.11以及以上的版本，cmake提供了一种Configure来引入外部项目依赖的方法。
+
+使用FetchContent的步骤总结起来就是:
+
+- 使用FetchContent_Declare(MyName) 获取项目。可以是一个URL也可以是一个Git仓库。
+- 使用FetchContent_GetProperties(MyName) 获取我们需要的变量MyName_*。
+- 使用add_subdirectory(${MyName_SOURCE_DIR} ${MyName_BINARY_DIR})引入项目。
+
+在cmake3.14版本，官方又提供了更方便的FetchContent_MakeAvailable方法，将步骤2，3集成在了一起。为了兼容3.11版本，我们可以把它封装成一个宏，这样就可以统一使用FetchContent_MakeAvailable方法了。
+
+```cmake
+# 添加第三方依赖包
+include(FetchContent)
+# FetchContent_MakeAvailable was not added until CMake 3.14
+if(${CMAKE_VERSION} VERSION_LESS 3.14)
+    include(add_FetchContent_MakeAvailable.cmake)
+endif()
+ 
+set(SPDLOG_GIT_TAG  v1.4.1)  # 指定版本
+set(SPDLOG_GIT_URL  https://github.com/gabime/spdlog.git)  # 指定git仓库地址
+ 
+FetchContent_Declare(
+  spdlog
+  GIT_REPOSITORY    ${SPDLOG_GIT_URL}
+  GIT_TAG           ${SPDLOG_GIT_TAG}
+)
+ 
+FetchContent_MakeAvailable(spdlog)
+```
+
+有时候，已经本地下载了库的源码，这时候注释掉 FetchContent_Declare()中的这些部分，如下所示
+
+```cmake
+FetchContent_Declare(
+  spdlog
+  SOURCE_DIR ${CMAKE_SOURCE_DIR}/3rdparty/spdlog   
+#  GIT_REPOSITORY    ${SPDLOG_GIT_URL}
+#  GIT_TAG           ${SPDLOG_GIT_TAG}
+)
+```
+
+---
+
+我一般很少用这个，还是习惯将依赖的源码下载下来，进行编译，再使用，这种就是自动下载依赖源码，然后直接用依赖源码的中CMakeLists.txt来编译依赖。比如[yaml-cpp](https://github.com/jbeder/yaml-cpp)这个项目中的readme中，就是用的FetchContent这个方法来完成的。如下
+
+```cmake
+	# 添加yaml库
+    include(FetchContent)
+    FetchContent_Declare(
+        yaml-cpp
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/3rdparty/yaml-cpp  #这就是我下到本地了
+        # GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        # GIT_TAG <tag_name> # Can be a tag (yaml-cpp-x.x.x), a commit hash, or a branch name (master)
+    )
+    FetchContent_GetProperties(yaml-cpp)
+    if(NOT yaml-cpp_POPULATED)      # 后面这些是这个库的readme让这么写的
+        message(STATUS "Fetching yaml-cpp...")
+        FetchContent_Populate(yaml-cpp)
+        add_subdirectory(${yaml-cpp_SOURCE_DIR} ${yaml-cpp_BINARY_DIR})
+    endif()
+```
+
+
 

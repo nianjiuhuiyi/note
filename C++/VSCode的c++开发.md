@@ -1,9 +1,51 @@
-当vscode来编辑器，当出现.dll动态库找不到的时候，就搜索一下，然后将其所在的路径添加到环境变量中就好了。
+安装说明：
 
-运行python程序时，它的python debug console终端太丑了，在setting.json里加这么一行就行了：
-"terminal.integrated.automationShell.windows": "cmd.exe",
+- 尽量就安装在C盘，不要去改到D盘，在公司电脑，改到D盘，启动就会报错，黑屏闪退，一个[说明](https://blog.csdn.net/qq_36307368/article/details/133548357)。
+- 后续插件，生成的缓存会占用很多C盘地址，修改这些路径，[教程](https://blog.csdn.net/weixin_44205779/article/details/132298257)。（==暂放这里吧，不去折腾了，没用，还是在C盘里==）
+  - 在其启动的快捷方式添加两个参数：--user-data-dir、--extensions-dir
+    "C:\Program Files\Microsoft VS Code\Code.exe" --user-data-dir "E:\Cache\vscode\Code" --extensions-dir "E:\Cache\vscode\extensions"
+  - 但是用code，命令行启动的vscode，是没添加这参数的，去到vscode安装的bin路径里，把“code.bat”备份一下，然后重新写一个code.bat，里面的内容就是上面那整行代码。
+  - 这俩都设置好了去，去看这个[教程](https://zhuanlan.zhihu.com/p/656707737)，把生成在C盘里的缓存、插件都删了。
 
-- terminal终端要加添加vs、anaconda、qt这些环境时，去菜单栏看这些prompt快捷方式所在的路径，然后再看其属性，就能知道它是怎么启动那些初始化环境的.bat文件的，就可以仿照着写进win新的终端的配置文件中。
+
+
+当vscode来编辑器，当出现.dll动态库找不到的时候，就搜索一下，然后将其所在的路径添加到环境变量中就好了。或者在launsh.json中添加
+
+```
+"environment": [
+     {"name": "PATH", "value": "D:\\lib\\ffmpeg\\bin;%PATH%"}
+ ],
+```
+
+打开setting.json：ctrl+shift+P(或者F1),输入"Preferences: Open USER Settings (JSON)"  # 可能没有 USER
+
+- 运行python程序时，它的python debug console终端太丑了，在setting.json里加这么一行就行了：
+  "terminal.integrated.automationShell.windows": "cmd.exe",
+
+- terminal终端要加添加vs、anaconda、qt这些环境时，去菜单栏看这些prompt快捷方式所在的路径，然后再看其属性，就能知道它是怎么启动那些初始化环境的.bat文件的，就可以仿照着写进win新的终端的配置文件中（老版本是下面5.1win下编译的步骤）
+
+  ```json
+  { // 最外层的大括号是setting.json中最外层的，把下面的内容加入就好
+  	
+  	"terminal.integrated.profiles.windows": {
+          "VS2017 x64 Native Tools": {
+              "path": [
+                  "${env:windir}\\System32\\cmd.exe"
+              ],
+              "args": [
+                  "/K",
+                  // "D:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat"
+                  // 上面这行就是下面这两行的一起的意思
+                  "D:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                  "x64"      // x64、x86、x86_x64  这三种都行
+              ],
+              "icon": "terminal-cmd"
+          }
+      },
+  
+  }
+  ```
+
 - 启动黑屏闪退，需要添加一个参数 code.exe --no-sandbox
 
 .bat文件，最后一行可以加一个 pause 这样终端就是vs的那种停住，按任意键运行。 
@@ -13,7 +55,7 @@
 - MinGW：
   - cmake -G "MinGW Makefiles" ..     # 必须要有参数-G
   - mingw32-make.exe        # 得到的Makefile可修改，具体看Makefike学习笔记
-- MSVC：（命令行的话，定要用vs的终端打开）
+- MSVC：（命令行的话，定要用vs的终端打开）（路径中一定不要有中文，否则会直接报错，提示.../cl.exe -- broken）
   - cmake -G "NMake Makefiles" ..   # 记得加 -G
   - nmake
   - 注意：vscode一打开这带有CMakelists.txt的文件，就会自动生成，生成的东西是不对的，先把里面删除干净，再来执行上面的命令
@@ -48,6 +90,10 @@ namke想要开启多核编译的话：
   把 Debug:start without debugging 改成 F5   # 相当于对调了，然后F5下一个断点还是不变
 - 在setting中搜索“autocomplete”，然后勾选C_CPP:Autocomplete Add Parenthese，这样就可以在tab补全函数名时自动带括号，相关[地址](https://www.zhihu.com/question/396273345/answer/2265355913)。
 - 快速隐藏/显示终端窗口的快捷键：Ctrl + j
+- 最新版，顶部中间有很大的搜索框，严重影响拖拽vscode，关闭方式：
+  - 第一种：设置中搜索“command center”，点击关闭。
+  - 第二种：在顶部空白处，右键，也能取消勾选“command center”。
+- 中文字体上有黄框，取消：设置中搜索“Unicode”，把 Editor > Unicode Hightlight: Non Basic ASCII 这一项设为false就行了。
 
 ---
 
@@ -60,10 +106,14 @@ namke想要开启多核编译的话：
   - cmake下载地址：[这里](https://cmake.org/files/)。可下载msi文件安装，也可直接下包
   - 下载完毕后，解压到某个地方，然后==bin目录添加环境变量==就行了
     - 一个注意点，比如git的bin目录中也加入了环境变量，它里面的sh.exe就会造成影响，在cmake时就会得到这样的错误：sh.exe was found in your PATH, here:D:/program files/Git/bin/sh.exe；For MinGW make to work correctly sh.exe must NOT be in your path.。现在暂时的解决办法就是去把那bin下的sh.exe改名一下(其它在环境变量中还有的sh.exe也可能会有这个影响)
+  
 - vscode的插件安装
+  
   - c/c++  # 相关的三个Microsoft的都装上吧
+  
   - cmake（装吧）（它的作用是方便看，编辑CMakelests.txt）
-  - ==cmake tools==（一定装）（它的作用是使用第三方库时，方便进去看源码，如果禁用掉，第三方库在平时编辑时就点不进去，下面还会有红色的波浪线）它里面还有两个参数设置
+  
+  - ==cmake tools==（一定装）（它的作用是使用第三方库时，方便进去看源码，如果禁用掉，第三方库在平时编辑时就点不进去，下面还会有红色的波浪线）它里面还有两个参数设置（我都建议关了）
     
     - Configure On Edit   打开的话，一修改CMakelests.txt，就会自动cmake（搜索这个选项，然后在Cmake Tools中）
     
@@ -94,14 +144,27 @@ namke想要开启多核编译的话：
     
         Tips:
         	name自己起；C/CXX路径都是给到cl.exe的路径；name值注意；要用x86，就添加一个新的x86的路径。这个"CMT_MSVC_PATH"属性名字乱起的，在那时没发觉其用处（因为只是添加cl.exe所在路径是没有的，只能通过vs自来的cmd进来）。
+    
+  - Doxygen Documentation Generator：快速生成注释文件，比如在cpp函数钱，输入`/**`，然后回车；
+  
+    - 修改默认样式就是进到设置里搜索“doxygen”。跟vs基本是保持一致的。
+  
+  - python的环境：
+  
+    - python的插件；
+    - python debuger：有这个才能去F5运行，debug
+  
   - 可选的插件：
     - Code Runner：右键即可编译运行单文件，很方便；但无法Debug（暂时没用）；
     - One Dark Pro：大概是VS Code安装量最高的主题（颜色比较红，暂时没用）；
     - Draw.io Integration：直接用VScode画流程图的，对应文件后缀名是==.drawio==；
-    - Doxygen Documentation Generator：快速生成注释文件，比如在cpp函数钱，输入/**，然后回车；
     - clangd：（暂时没用，但提示不太友好时来试试）说这是一个c++语法自动提示的插件，用它来替代微软的c/c++那三个插件，说qtcreater的智能提示就是用的这个，更加友好。
     - vscode-json：做json格式化的，安装后快捷键 “ctrl+alt+b”。或者ctrl+shift+p把命令面板弹出来，输入vscode-json，就能看到其对应的功能了。
-    - Git Graph：git的可视化，还是比较好用的。
+    - Git Graph：git的可视化，还是比较好用的。（安装后，左下角就有对应可以点的看）
+    - autoDocstring：python函数快速参数注释(像pycharm那样)，装好后，在设置中，搜索autoDocstring，找到 Auto Docstring: Docstring Format；选中要用的格式，其中 sphinx 和 pycharm的reStructuredText有些像。更多的可以看[这里](https://blog.csdn.net/qq_36810398/article/details/122062164)，甚至更进阶的自定义设置看[这里](https://zhuanlan.zhihu.com/p/620693616)。
+    - Material Icon Theme：图标主题，图标更好看了。
+    - shellman：提供了在linux下写shell脚本的自动补全和联想功能。
+    - CUDA开发的相关插件：“Nsight Visual Studio Code Edition”、“vscode-cudacpp”
 
 ### vscode远程服务器配置
 
@@ -420,7 +483,7 @@ Tips：
                 {"name": "DISPLAY", "value": "192.168.108.147:0.0"}, 
                 {"name": "abc", "value": "a_test"}
             ],
-            // true：就是使用单独的cmd窗口；false：使用内置终端（有显示不全的可能）
+            // true：就是使用单独的cmd窗口；false：使用内置终端（有显示不全的可能）（现在可能不是这个参数了，去看5.1debug）
             "externalConsole": false, 
             
             "MIMode": "gdb",  // 指定连接的调试器，可以为gdb或lldb。但我没试过lldb
@@ -440,6 +503,8 @@ Tips：
 ```
 
 #### tasks.json
+
+- 注意：这么写，cmake和make的任务是同时进行的，所以很多时候，第一次执行时，因为cmake没执行完，同时执行的make就会报错
 
 ```json
 {
@@ -464,7 +529,7 @@ Tips：
                 "kind": "build",
                 "isDefault": true
             },
-            "command": "make",
+            "command": "make",      // 后面暂时不要跟 -j4 这种，会报错
             "args": [
 
             ]
@@ -608,7 +673,7 @@ Run--->Open Configurations--->Python--->Python File
 
 在windows下也是可以直接用命令行编译vs的Makefile,而不是.sln工程的：
 
-1. 环境准备：
+1. 环境准备：（现在新版不支持自定一终端了，按照最上面去改setting.json文件）
 
    - 首先把vs的编译器==cl.exe==加入到环境变量，一般它的路径如下(注意使用64的)(这也不是必须，因为执行下面的.bat后，环境都会弄好)：
 
@@ -651,7 +716,7 @@ Run--->Open Configurations--->Python--->Python File
 
 以上是一种原理，了解一下挺好，但是要直接快速使用，还是按照我写的[这个博客](https://blog.csdn.net/nianjiuhuiyi/article/details/121154365)来操作。
 
-### 5.2 debug
+### 5.2 ==debug==
 
 ​	5.1中的操作就是win下命令行的编译，用的是msvc的编译器和库，这种就可以直接只用windows下opencv已经编译好的MSVC版本(特别注意：这个已经编译好的版本，win下的mingw是不能使用的)，vscode中如下操作：
 
@@ -684,8 +749,12 @@ Run--->Open Configurations--->Python--->Python File
               "args": [],
               "stopAtEntry": false,
               "cwd": "${fileDirname}",
-              "environment": [],
-              "console": "externalTerminal",
+              // 注意，win上用ffmpeg库做开发时，可能bin路径没添加进PATH环境变量，能编译成功，但用vscode、预览终端运行时没任何反应，用自带cmd运行才会提示.dll找不到，通过下面的方式来设置环境变量
+              "environment": [
+              	{"name": "PATH", "value": "D:\\lib\\ffmpeg\\bin;%PATH%"}
+              ],
+              // 这是会像vs那样打开外部终端，integratedTerminal 则是用自带的终端
+              "console": "externalTerminal",      // "console": "integratedTerminal",
               "preLaunchTask": "C/C++: cl.exe 生成活动文件"
           }
       ]
@@ -694,42 +763,433 @@ Run--->Open Configurations--->Python--->Python File
 
 - tasks.json
 
+  - 新版，不用再提前初始化vs的终端环境，同时也因为任务有了先后顺序，不会再存在第一次进来时，因为cmake没执行完，nmake提示没有Makefile，然后要再运行一次的问题。
+  
+    - 注意：下面的参数，.bat的路径是要加引号的，所以要有转义字符，用&&把命令连接起来，这样就保证了有msvc的环境
+  
+    ```json
+    {
+        "version": "2.0.0",
+        "options": {
+            "cwd": "${workspaceFolder}/build"   // 注意这里是 workspaceFolder
+        },
+        "tasks": [
+            {
+                "label": "build_project",
+                "type": "shell",
+                "command": "${env:windir}\\System32\\cmd.exe",
+                "args": [
+                    // /k是在cmd执行命令后保持终端窗口打开，这样任务就永远完不成，launch.json依赖于这，就永远不会运行
+                    "/c",     // /c是命令执行完毕后，按任意键退出，任务就算完成
+                    "\"D:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64 && cmake -G \"NMake Makefiles\" .. && nmake",
+                ]  
+    			// 上面的是vs2017的地址，vs2020地址可能如下：
+                // D:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat
+            },
+            {
+                "label": "C/C++: cl.exe 生成活动文件",  // 这里和laubch.json的`preLaunchTask`值保持一致
+                "dependsOn": [
+                    "build_project",
+                ]
+            }
+        ]
+    }
+    ```
+  
+    - 在linux下，可以写一个build.sh脚本，里面包括设定环境变量、cmake、make等一系列命令，然后在：
+      "command": "./build.sh",   // 这样就只需要一个task任务就可以了。
+  
+  - 旧版本：(对于vs的项目，暂时不会这么用了)
+  
+    ```json
+    {
+        "version": "2.0.0",
+        "options": {
+            "cwd": "${workspaceFolder}/build"   // 注意这里是 workspaceFolder
+        },
+        "tasks": [
+            {
+                "label": "cmake",
+                "type": "shell",
+                "command": "cmake",
+                "args": [
+                    "-G",
+                    "NMake Makefiles",
+                    ".."
+                ]
+            },
+            {
+                "label": "nmake",
+                "group": {
+                    "kind": "build",
+                    "isDefault": true,
+                },
+                "command": "nmake",
+                "args": [
+    
+                ]
+            },
+            {
+                "label": "C/C++: cl.exe 生成活动文件",  // 这里和laubch.json的`preLaunchTask`值保持一致
+                "dependsOn": [
+                    "cmake",
+                    "nmake"
+                ]
+            }
+        ]
+    }
+    ```
+
+### 5.3. CMakePresets.json
+
+​	这其实就是vs的cmake配置，在项目根目录里添加“CMakePresets.json”这个文件，然后用vscode打开，vscode最下面的状态栏build、debug、运行的按钮就都能用了，它会完全取代掉launch.json、task.json。我放这里做个参考吧，github上两个项目：rpcs3、slang。
+
+优点：不用launch.json、task.json了，把模板复制进项目就能用，也不用设置vs环境变量，它就是默认编成.sln项目。
+
+缺点：程序运行有问题，以opencv的为例，用之前的方法还是正常的，用这种方法，它会直接打开摄像头失败，不知道为啥。
+
+- rpcs3项目里的：
+
   ```json
   {
-      "version": "2.0.0",
-      "options": {
-          "cwd": "${workspaceFolder}/build"   // 注意这里是 workspaceFolder
+    "version": 3,
+    "configurePresets": [
+      {
+        "name": "gcc",
+        "generator": "Ninja",
+        "binaryDir": "build-gcc",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug",
+          "USE_NATIVE_INSTRUCTIONS": "ON",
+          "USE_PRECOMPILED_HEADERS": "ON",
+          "USE_FAUDIO": "OFF",
+          "USE_SYSTEM_CURL": "OFF",
+          "USE_SYSTEM_ZLIB": "OFF",
+          "USE_SYSTEM_LIBPNG": "OFF",
+          "USE_SYSTEM_OPENCV": "ON",
+          "BUILD_LLVM": "OFF",
+          "STATIC_LINK_LLVM": "ON"
+        }
       },
-      "tasks": [
-          {
-              "label": "cmake",
-              "type": "shell",
-              "command": "cmake",
-              "args": [
-                  "-G",
-                  "NMake Makefiles",
-                  ".."
-              ]
-          },
-          {
-              "label": "nmake",
-              "group": {
-                  "kind": "build",
-                  "isDefault": true,
-              },
-              "command": "nmake",
-              "args": [
-  
-              ]
-          },
-          {
-              "label": "C/C++: cl.exe 生成活动文件",  // 这里和laubch.json的`preLaunchTask`值保持一致
-              "dependsOn": [
-                  "cmake",
-                  "nmake"
-              ]
+      {
+        "name": "clang",
+        "generator": "Ninja",
+        "binaryDir": "build-clang64",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug",
+          "USE_NATIVE_INSTRUCTIONS": "ON",
+          "USE_PRECOMPILED_HEADERS": "ON",
+          "USE_FAUDIO": "OFF",
+          "USE_SYSTEM_CURL": "OFF",
+          "USE_SYSTEM_ZLIB": "OFF",
+          "USE_SYSTEM_LIBPNG": "OFF",
+          "USE_SYSTEM_OPENCV": "ON",
+          "LLVM_ENABLE_LIBCXX": "ON",
+          "BUILD_LLVM": "OFF",
+          "STATIC_LINK_LLVM": "ON"
+        },
+        "environment": {
+          "CXX": "clang++",
+          "CC": "clang"
+        }
+      },
+      {
+        "name": "msvc",
+        "displayName": "Windows x64",
+        "generator": "Visual Studio 17 2022",
+        "binaryDir": "build-msvc",
+        "architecture": {
+          "value": "x64",
+          "strategy": "external"
+        },
+        "cacheVariables": {
+          "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
+          "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+          "USE_NATIVE_INSTRUCTIONS": "ON",
+          "USE_PRECOMPILED_HEADERS": "ON",
+          "USE_FAUDIO": "OFF",
+          "USE_SYSTEM_CURL": "OFF",
+          "USE_SYSTEM_ZLIB": "OFF",
+          "USE_SYSTEM_OPENAL": "OFF",
+          "USE_SYSTEM_OPENCV": "OFF",
+          "BUILD_LLVM": "ON",
+          "STATIC_LINK_LLVM": "ON"
+        },
+        "vendor": {
+          "microsoft.com/VisualStudioSettings/CMake/1.0": {
+            "hostOS": [
+              "Windows"
+            ]
           }
-      ]
+        }
+      }
+    ],
+    "buildPresets": [
+      {
+        "name": "msvc-debug",
+        "configurePreset": "msvc",
+        "configuration": "Debug"
+      },
+      {
+        "name": "msvc-release",
+        "configurePreset": "msvc",
+        "configuration": "Release"
+      }
+    ]
+  }
+  ```
+
+- slang项目中的：
+
+  ```json
+  {
+    "version": 6,
+    "cmakeMinimumRequired": {
+      "major": 3,
+      "minor": 25,
+      "patch": 0
+    },
+    "configurePresets": [
+      {
+        "name": "default",
+        "description": "Default build using Ninja Multi-Config generator",
+        "generator": "Ninja Multi-Config",
+        "binaryDir": "${sourceDir}/build",
+        "cacheVariables": {
+          "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+        }
+      },
+      {
+        "name": "emscripten",
+        "description": "Emscripten-based Wasm build",
+        "generator": "Ninja Multi-Config",
+        "binaryDir": "${sourceDir}/build.em",
+        "cacheVariables": {
+          "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+          "CMAKE_C_FLAGS_INIT": "-fwasm-exceptions -Os",
+          "CMAKE_CXX_FLAGS_INIT": "-fwasm-exceptions -Os",
+          "CMAKE_EXE_LINKER_FLAGS": "-sASSERTIONS -sALLOW_MEMORY_GROWTH -fwasm-exceptions --export=__cpp_exception"
+        }
+      },
+      {
+        "name": "msvc-base",
+        "hidden": true,
+        "inherits": "default",
+        "description": "Options specific for MSVC",
+        "cacheVariables": {
+          "CMAKE_C_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP",
+          "CMAKE_CXX_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP"
+        }
+      },
+      {
+        "name": "vs2019",
+        "inherits": "msvc-base",
+        "description": "Visual Studio 2019 project",
+        "generator": "Visual Studio 16 2019"
+      },
+      {
+        "name": "vs2022",
+        "inherits": "msvc-base",
+        "description": "Visual Studio 2022 project",
+        "generator": "Visual Studio 17 2022"
+      },
+      {
+        "name": "vs2022-dev",
+        "inherits": "msvc-base",
+        "description": "Visual Studio 2022 project with debug assisting features",
+        "generator": "Visual Studio 17 2022",
+        "cacheVariables": {
+          "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+        }
+      },
+      {
+        "name": "slang-llvm",
+        "inherits": "default",
+        "description": "Build slang-llvm from the system LLVM",
+        "cacheVariables": {
+          "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
+        }
+      },
+      {
+        "name": "generators",
+        "inherits": "default",
+        "description": "Build the compile time generators used in building Slang",
+        "cacheVariables": {
+          "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+          "SLANG_ENABLE_SLANG_RHI": false
+        }
+      }
+    ],
+    "buildPresets": [
+      {
+        "name": "debug",
+        "configurePreset": "default",
+        "configuration": "Debug"
+      },
+      {
+        "name": "release",
+        "configurePreset": "default",
+        "configuration": "Release"
+      },
+      {
+        "name": "releaseWithDebugInfo",
+        "configurePreset": "default",
+        "configuration": "RelWithDebInfo"
+      },
+      {
+        "name": "emscripten",
+        "configurePreset": "emscripten",
+        "configuration": "Release",
+        "targets": ["slang-wasm"]
+      },
+      {
+        "name": "generators",
+        "inherits": "release",
+        "configurePreset": "generators",
+        "targets": ["all-generators"]
+      },
+      {
+        "name": "slang-llvm",
+        "inherits": "release",
+        "configurePreset": "slang-llvm",
+        "targets": ["slang-llvm"]
+      }
+    ],
+    "packagePresets": [
+      {
+        "name": "base",
+        "hidden": true,
+        "configurePreset": "default",
+        "generators": ["ZIP"],
+        "variables": {
+          "CPACK_PACKAGE_FILE_NAME": "slang",
+          "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm"
+        }
+      },
+      {
+        "name": "release",
+        "inherits": "base",
+        "configurations": ["Release"],
+        "packageDirectory": "dist-release"
+      },
+      {
+        "name": "releaseWithDebugInfo",
+        "inherits": "base",
+        "configurations": ["RelWithDebInfo"],
+        "packageDirectory": "dist-releaseWithDebugInfo"
+      },
+      {
+        "name": "debug",
+        "inherits": "base",
+        "configurations": ["Debug"],
+        "packageDirectory": "dist-debug"
+      },
+      {
+        "name": "generators",
+        "inherits": "release",
+        "configurePreset": "generators",
+        "variables": {
+          "CPACK_PACKAGE_FILE_NAME": "slang-generators",
+          "CPACK_COMPONENTS_ALL": "generators"
+        }
+      },
+      {
+        "name": "slang-llvm",
+        "inherits": "release",
+        "configurePreset": "slang-llvm",
+        "variables": {
+          "CPACK_PACKAGE_FILE_NAME": "slang-llvm",
+          "CPACK_COMPONENTS_ALL": "slang-llvm"
+        }
+      }
+    ],
+    "workflowPresets": [
+      {
+        "name": "debug",
+        "steps": [
+          {
+            "type": "configure",
+            "name": "default"
+          },
+          {
+            "type": "build",
+            "name": "debug"
+          },
+          {
+            "type": "package",
+            "name": "debug"
+          }
+        ]
+      },
+      {
+        "name": "release",
+        "steps": [
+          {
+            "type": "configure",
+            "name": "default"
+          },
+          {
+            "type": "build",
+            "name": "release"
+          },
+          {
+            "type": "package",
+            "name": "release"
+          }
+        ]
+      },
+      {
+        "name": "releaseWithDebugInfo",
+        "steps": [
+          {
+            "type": "configure",
+            "name": "default"
+          },
+          {
+            "type": "build",
+            "name": "releaseWithDebugInfo"
+          },
+          {
+            "type": "package",
+            "name": "releaseWithDebugInfo"
+          }
+        ]
+      },
+      {
+        "name": "generators",
+        "steps": [
+          {
+            "type": "configure",
+            "name": "generators"
+          },
+          {
+            "type": "build",
+            "name": "generators"
+          },
+          {
+            "type": "package",
+            "name": "generators"
+          }
+        ]
+      },
+      {
+        "name": "slang-llvm",
+        "steps": [
+          {
+            "type": "configure",
+            "name": "slang-llvm"
+          },
+          {
+            "type": "build",
+            "name": "slang-llvm"
+          },
+          {
+            "type": "package",
+            "name": "slang-llvm"
+          }
+        ]
+      }
+    ]
   }
   ```
 
@@ -765,3 +1225,10 @@ Run--->Open Configurations--->Python--->Python File
 
 如果要改task.json中的内容，一般是在第二次往后可能会用到，在输入run task选择后，就会出现第一次配置的task.json的名字，这个例子就是上面的“my_msvc”，然后点击后面的设置图标就能进来修改内容了。
 
+## 8. Run to Cursor
+
+vscode是可以像vs、pycharm那样运行到光标所在行的，有如下三种方式：
+
+- （1）在想运行到的行打断点。
+- （2）在debug的时候，点击想要运行到的行号上，会出现“Run to Line”，点一下就好了，在非debug下，是没有这个选项的。 # 推荐就用这吧
+- （3）添加快捷键：在快捷键中搜索“Run to Cursor”，绑定一个快捷键，要于vs保持一致的话，可用F5。  # 我暂时没设置

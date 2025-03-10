@@ -12,18 +12,95 @@ Person p_a(“张三”)；
 Person p_a{“张三”}；   这俩都是可以的，最近看到不少类实例化用的这个{}  # 更新，看到一些使用{}这个方式实例化(这是列表初始化)的，很大概率这个类是一个stl的容器类别，或者这个自定义的类继承了一个类(这个类可能是标准容器类，也可能是一个自定义类继承了标准容器类)
 
 	- 出现了，在tensorrt的教程中，`nvinfer1::Weights conWeights {nvinfer1::DataType::kFLOAT, nullptr, size};`只能用花括号初始化，改用大括号()，ide提示报错，没有匹配的构造函数。难道用()是用的构造函数，而{}不是用的构造函数？
-	
-	- OpenAI给出了解答：
-	Q：c++中，实例化类对象时，使用{}和()之间的区别？
-	A：{}是初始化列表，用来初始化类的成员变量；()是构造函数，用来初始化类的其他部分，比如调用其他函数，分配内存等。
-	Q：那么{}初始化列表时怎么知道那个值对应哪个呢？
-	A：{}中的值会按照类中成员变量的声明顺序进行初始化，因此可以根据类中成员变量的声明顺序来确定{}中的值对应哪个成员变量。
-	
-	总结：我自己试了下，都还是要有参构造函数的实现，()、{}才不会报错，所以我实例化还是用(),然后还是知道有{}这么个初始化的方式(花括号就是列表初始化)。
+
+- {}是C++11及以后版本的初始化语法，称为统一初始化或列表初始化。它将成员变量按照花括号内的初始化顺序和方式进行初始化。如果没有提供初始值，那么对应的花括号内的成员就会用默认值进行初始化。
+
+理解下面这个，就能明白大致明白这俩区别的，选哪种初始化都OK。
+
+```c++
+#include <iostream>
+#include <string>
+#include <vector>
+#include <map>
+
+class Demo {
+public:
+    Demo() { std::cout << "我是Demo类的无参构造函数" << std::endl; }
+    Demo(int x, const std::string &y) : m_Age(x), m_Name(y) {std::cout << "我是Demo类的有参构造函数" << std::endl;}
+    // 主要下面这个有参构造函数，用了std::initializer_list，就能接受比较多的参数
+    Demo(std::initializer_list<std::pair<int, std::string> > initList) {
+        std::cout << "已经在Demo的 std::initializer_list 的另一种有参构造函数中" << std::endl;
+        for (std::pair<int, std::string> val : initList) {
+            this->m_Age = val.first;
+            this->m_Name = val.second;
+        }
+    }
+    // 上面三个都是构造函数，下面这个是赋值运算符的重载
+    Demo& operator=(const Demo &d) {std::cout << "我是Demo的=运算符重载" << std::endl;}
+
+    int m_Age;
+    std::string m_Name;
+};
+
+// 1、大括号初始化
+void brace_init() {
+    Demo d1(11, "aa");         // 走的简单的有参构造
+    Demo d2 = Demo(22, "bb");  // 这依然是走的简单的有参构造
+    Demo d3 = d2;              //  这样写，什么都不会打印
+    d3 = d2;                   // 这样是运算符重载
+    
+    // 千万注意：要用无参构造，直接就是
+    Demo d5;                   // 走的无参构造
+    // 千万别写成了 Demo d5();  别想成python了。
+    //  Demo d5() 这不是无参构造，而是一个函数声明 
+}
+
+// 2、花括号初始化
+void breac_init2() {
+    /*  讲一下花括号具体是按照什么规则去初始化（传了值的）
+    1、首先查找有参构造函数有没有 std::initializer_list ，如果有，且能匹配上，那么就会优先匹配这个构造函数；
+    2、如果条件1不成立，那么查看有没有其它有参构造函数有没有能匹配上的，如果有就选用这个；
+    3、如果条件2不成立，看看是不是聚合类（聚合类在1c++基础中有介绍）,如果是的话，{}会触发聚合类初始化，
+    	严格按照成员声明的顺序以此初始化。
+    */
+    
+    Demo d1{11, "aa"};         // 简单的有参构造
+    Demo d2 = Demo{22, "bb"};  // 依然走的是简单的有参构造函数
+    Demo d2{};                 // 无参构造（花括号可以这样写，大括号千万不能，就成了函数声明而不是实例化对象）
+    // 注意下面这个：这是进了有 std::initializer_list 的构造函数
+    Demo d4{{11, "aa"}, {22, "bb"}}; 
+    
+    // 简单来说，上面的Demo类，把任何构造函数删了，且两个成员变量都是public的（这就是聚合类，跟结构体差不多了），就可以
+    Demo d5{55, "cc"};  // 我一般喜欢这么写  Demo d5 = {55, "cc"};
+    // 这就是结构体那种初始化，严格按照成员变量的声明顺序的
+
+    // 顺带普及一个“宽窄转换问题”
+    int a = 3.14;  
+    int b = 1234567890111;
+    std::cout << a << std::endl;  // 只会取整数
+    std::cout << b << std::endl;  // 编译就会提醒，从 long long int 到int了，值成了1912276159
+
+    int a1(10);
+    int a2{10};    // 这都OK
+
+    int a3(3.14);  // 这OK
+    int a4{3.14};  // 这会直接报错，编译都过不了
+}
+
+int main(int argc, char* argv[]) {
+    // {}还常用于值的初始化，下面这两种初始都是可以的，都是得益于 std::initializer_list
+    std::vector<int> v1{1, 2, 3};
+    std::vector<int> v2 = {1, 2, 3};
+
+    std::map<int, std::string> m1{{0, "car"}, {1, "cpu"}};
+    std::map<int, std::string> m2 = {{0, "car"}, {1, "cpu"}};
+    return 0;
+}
+```
 
 ## 一、lambda表达式
 
-### 1.1 lambda定义	
+### 1.1. lambda定义	
 
 ​	目前为止：使用过的仅有的良好总可调用对象是函数和函数指针，另外还有其他两种可调用对象：重载了函数调用运算符的类(应该就是仿函数),以及==lambda表达式==。
 
@@ -39,20 +116,22 @@ Person p_a{“张三”}；   这俩都是可以的，最近看到不少类实�
 
 - function body：函数体；
 
-- 注意：lambda具体有两种写法，==一种==是单成一行赋值给一个对象，那么这种必须使用尾置返回来指定返回类型，
+- 注意：lambda具体有两种写法，==一种==是单成一行赋值给一个对象，那么这种必须使用尾置返回来指定返回类型
 
   - ```c++
     auto func = [](int a, int b) {return a + b; };   // 1、2行是一样的，可以不要返回类型，然后通过return推断
     auto func = [](int a, int b) -> int {return a + b; };  // 尾置返回来指定返回类型(可能以后会搜索后置返回类型)
     // int func = [](int a, int b) -> int {return a + b; };  // 这就就是错的
+    std::function<int(int, int)> func12 = [](int a, int b) {return a + b; };  // 这种也是OK的
     ```
-
-    - 注意看上面代码，这前面只能写auto,不能写具体的数据类型，如第3行直接就是错的。
-
-    - 这种也是定量定义在函数体内(至少在main函数中)，==capture list中的参数不要使用定义在main函数外的全局变量==，会直接报错的。
-
+  ```
+    
+  - 注意看上面代码，这前面只能写auto,不能写具体的数据类型，如第3行直接就是错的。
+    
+  - 这种也是定量定义在函数体内(至少在main函数中)，==capture list中的参数不要使用定义在main函数外的全局变量==，会直接报错的。
+    
   - ==另外一种==是下面的示例，lambda直接写进std::for_each算法的参数位置当参数,for_each的是一个vector,vector中的元素是pair,那么(参数列表)里，给参数类型就要给pair，然后后面的操作就是对vector中的每一个元素,即pair进行操作。
-
+  
     ```c++
     std::vector<std::pair<std::string, int>> vec = { 
     	{"zhangsan", 13}, {"lis", 14} };
@@ -60,7 +139,7 @@ Person p_a{“张三”}；   这俩都是可以的，最近看到不少类实�
     std::for_each(vec.begin(), vec.end(), 
     	[](std::pair<std::string, int> p) {std::cout << p.first << " : " << p.second << std::endl; }
     );
-    ```
+  ```
 
 - 若是单成一行，最后结尾肯定要分号(就相当于日常每行完了有分号一样)，若是直接写在参数位置就不需要分号了。
 
@@ -103,7 +182,7 @@ int main() {
 
 - 核心是13、19行，是直接把lambda函数写在算法传参的位置。
 
-### 1.2 lambda捕获和返回
+### 1.2. lambda捕获和返回
 
 - ==值捕获==（就就函数的值传递，会进行拷贝，你改变原值也无所谓）
 
@@ -172,7 +251,7 @@ int main() {
     - 当前面默认指定&时，部分想用值捕获的参数就直接写在后面，逗号分隔，前面不用加引号；
     - 当前面默认指定=时，部分想用引用捕获的参数写在后面，且前面必须要有&符号指定。
 
-### 1.3 可变lambda
+### 1.3. 可变lambda
 
 ​	默认情况下，对于一个值被拷贝的变量(值捕获)，lambda不会改变其值，如果我们希望能改变一个被捕获的变量的值，就必须在参数列表首加上关键字==mutable==，如下：
 
@@ -190,7 +269,7 @@ int main() {
 
 - 默认lambda是不改变捕获列表里的变量的值，如果不加mutable，编译器会直接在++a报错说表达式必须是可修改的左值，加上mutable就可以修改了。
 
-### 1.4 指定lambda返回类型
+### 1.4. 指定lambda返回类型
 
 ​	lambda只包含单一的return语句时，可以不指定其返回类型，编译器会自动推断，但如果一个lambda体包含return之外的任何语句，则编译器都会假定此lambda返回void，与其它返回void的函数类型，被推断返回void的lambda不能返回值。
 例子：使用标准库 transform 算法和一个lambda来讲一个序列中的每个负数替换为其绝对值：
@@ -234,7 +313,7 @@ int main() {
 }
 ```
 
-### 1.5 参数绑定
+### 1.5. 参数绑定
 
 ​	在一些如 std::find_if 算法时，第三个参数一般是一元谓词，但是每个数据作为一个参数默认进到这个一元谓词中，那么一元谓词中的长度(比如长度3)是写死了的，这里就没办法修改大于的长度；然而在用lambda表达式时，因为捕获列表的存在，是可以传进不止一个参数的，可以动态的指定长度sz，但如果函数体比较复杂，会多次复用时，使用lambda表达式就会比较复杂。
 
@@ -387,7 +466,7 @@ int main() {
 
 ## 二、动态内存与智能指针
 
-### 2.1 概念(重要)
+### 2.1. 概念(重要)
 
 - 静态内存：用来保存局部static对象、类static数据成员以及定义在任何函数之外的变量；
 - 栈内存：用来保存定义在函数内的非static对象；
@@ -436,13 +515,14 @@ r = q;  // 给r赋值，令它指向另一个地址；会递增q指向的对象�
 
 ​	传统的对象构造方式是使用圆括号，新标准下，也可以使用列表初始化(即使用花括号)，sting那里就有写到。
 
-### 2.2 shared_ptr智能指针
+### 2.2. shared_ptr智能指针
 
 shared_ptr和unique_ptr都支持的操作：
 
 - p->成员函数/属性     解引用*p
 - p.get()  // 返回p中所保存的指针，要小心使用，若智能指针释放了其对象，返回的指针所指向的对象也就消失了。
   - 书上也有一句，不要使用get来初始化另一个智能指针或是为智能指针赋值
+  - 比如 void task(std::queue\<cv::Mat\> *que); 我们的指针是这个类型的智能指针p，那传递的时候就是 task(p.get()), 这主要是针对调用的函数不可修改的情况下，如果可以的话，尽量去改task函数的接收参数类型，将其改为智能指针的类型 
 - swap(p,q)   // 交换p和q中的指针，也可以写作p.swap(q)
 
 #### 2.2.1 定义及基本使用
@@ -463,6 +543,15 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>(
 shared_ptr独有的操作：
 
 - std::make_shared\<T> (args);   // 返回一个shared_ptr，指向一个动态分配的类型为T的对象，并使用args初始化此对象。
+
+  - 比如一个类，args就是实例化类时传递的参数。
+
+  - ```c++
+    // 这是Yolov5类的构造函数
+    Yolov5::Yolov5(const std::string &weight_path, const std::string &labels_list_path, const std::string &output_dir);
+    
+    std::shared_ptr<Yolov5> m_Infer = std::make_shared<Yolov5>(./tools.pt, tools.txt, "output");  // ()里对应的就是传的参数
+    ```
 
 - std::shared_ptr\<T> p(q);   // p为shared_ptr指针q的拷贝，此操作会递增q中的计数器，q中的指针必须能转换为T* （这个T*在书4.11.2里有提及）
 
@@ -675,7 +764,7 @@ int main(int argc, char*argv[]) {
 
 ​	答：release成员的作用是放弃控制权并返回指针，因为在某一时刻只能有一个std::unique_ptr指向某个对象，unique_ptr不能被赋值，所以要用release成员将一个unique_ptr的指针的所有权传递给另外一个unique_ptr。而shared_ptr允许有多个shared_ptr指向同一个对象，因此不需要release成员。
 
-### 2.3 unique_ptr智能指针
+### 2.3. unique_ptr智能指针
 
 ​	当定义一个unique_ptr时，需要将其绑定到一个new返回的指针上，类似于shared_ptr，初始化unique_ptr必须采用直接初始化形式：
 
@@ -748,7 +837,7 @@ std::unique_ptr<int> my_clone(int p) {
 
 ​	还有一个向后兼容： 标准库较早版本包含了一个名为==std::auto_ptr==的类，它具有unique_ptr的部分特性，但不是全部，特别是，既不能在容器中保存auto_ptr，也不能从函数中返回auto_ptr，虽然auto_ptr仍是标准库的一部分，但是编写程序时应该使用unique_ptr。
 
-### 2.4 weak_ptr智能指针
+### 2.4. weak_ptr智能指针
 
 ​	std::weak_ptr是一种不控制所指向对象生存周期的智能指针，它指向由一个 shared_ptr 管理的对象，将一个weak_ptr绑定到一个shared_ptr不会改变shared_ptr的引用计数。一旦最后一个指向对象的shared_ptr被销毁，对象就会释放，即便有weak_ptr指向该对象。特性：
 
@@ -775,7 +864,7 @@ if (std::shared_ptr<int> np = wp.lock()) {  // np不为空条件才成立
 }
 ```
 
-### 2.5 动态数组
+### 2.5. 动态数组
 
 ​	了解一下，大多数应用应该使用标准库容器而不是动态分配的数组，使用容器更为简单，更不容易出现内存管理错误并且可能有更好的性能。
 
@@ -882,11 +971,11 @@ std::uninitialized_fill_n(q, v.size(), 42);  // 将剩余元素初始化为42
 
 ## 三、拷贝控制
 
-### 3.1 更新三/五法则
+### 3.1. 更新三/五法则
 
 ​	更新三五法则：所有的五个拷贝控制成员应该看作一个整体：一般来说，如果一个类定义了任何一个拷贝操作，它就应该定义所有五个操作(我的理解是拷贝构造函数、拷贝赋值运算符函数(就是重载，operator=)、析构函数、移动构造函数、移动赋值运算符函数)，某些类则是必须定义前三个才能正确工作。
 
-### 3.2 拷贝、赋值与销毁
+### 3.2. 拷贝、赋值与销毁
 
 #### 3.2.1 拷贝构造函数
 
@@ -958,7 +1047,7 @@ public:
 int Employee::unique_id = 5;   // 类内static变量必须类外初始化
 ```
 
-### 3.3 对象移动
+### 3.3. 对象移动
 
 ​	比如自己写数组的扩容，就可以不是把已有元素拷贝到新地址，而是直接移动，就会大幅度提升性能(这种拷贝也是拷贝后会直接销毁原对象)；；还有一个原因：源于IO类或unique_ptr这样的类，都包含了不能被共享的资源(如指针或IO缓冲)，因此这些类型的对象不能拷贝但可以移动。
 
@@ -971,6 +1060,7 @@ int Employee::unique_id = 5;   // 类内static变量必须类外初始化
 - 一种：有一些标注库类，包括string，都定义了所谓的“移动构造函数”，可以假定string的一定构造函数进行了指针的拷贝，而不是为字符分配内存空间然后拷贝字符。
 - 两种：名为std::move的标准库函数，它定义在`#include <utility>`头文件中，需要用std::move来表示希望使用string的移动构造函数，如果漏掉了move的调用，将会使用string的拷贝构造函数
 - 在2c++核心编程.md 中的 5.0.3 有关于对std::move的我的理解
+- 另外容器中，的\<algorithm>这头文件里也有 std::move，它是对容器的数据进行移动操作，类似于std::copy
 
 #### 3.3.2 右值引用
 
@@ -1159,7 +1249,7 @@ i = retVal();      // 正确：可以将一个右值作为赋值操作的右侧�
 
 ## 四、其它
 
-### 4.1 c++中的可调用对象(函数、函数指针、lambda表达式、bind创建的对象、匿名函数)
+### 4.1. c++中的可调用对象(函数指针、lambda表达式、bind创建的对象、匿名函数)
 
 这还是比较重要有意义的。
 
@@ -1228,11 +1318,13 @@ struct my_divide {
 };
 auto my_mod = [](int deno, int div) {return deno % div; };
 int main(int argc, char*argv[]) {
-	// 这里面插入的都是pair对组数据类型，还可以有别的写法
+    // 这里有两种写法，使用function包装或是函数指针，前面4.1也写到了
+    std::map<std::string, int(*) (int, int)> a_map；  // 跟下面std::function完全一样的
+	// 这里面插入的都是pair对组数据类型，还可以有别的写法（尽量用std::function写法，插入对象用lmbda写时可以用引用捕获参数，用纯函数指针就不行）
 	std::map<std::string, std::function<int(int, int)>> a_map = {
 		{"+", my_add},    // 函数指针
 		{"-", std::minus<int>()},    // 标准库函数对象
-		{"/", my_divide()},         // 我定义的函数对象(匿名对象)
+		{"/", my_divide()},         // 我定义的函数对象(匿名对象)（又叫仿函数）
 		{"*", [](int i, int j) {return i * j; }},   // 未命名的lambda
 		{"%", my_mod}               // 命名了的lambda对象
 	};
@@ -1244,7 +1336,37 @@ int main(int argc, char*argv[]) {
 
 Tips：新版标准库中的 function 类与旧版本中的unary_function和binary_function没有关联，后两个类已经被更通用的bind函数替代了。
 
-### 4.2 正则表达式
+- 注：函数指针跟std::function更细节的对比
+
+  ```c++
+  int x = 2;
+  int y = 3;
+  // 下面函数返回的都是int类型，
+  // ok的，比起上面不再传参，
+  std::map<std::string, std::function<int()>> a_map = {
+  	{"*", [&]() {return x * y; }},
+  };
+  
+  // 错误的，这里用函数指针，想不传参，直接都是编译不通过的
+  std::map<std::string, int(*) ()> b_map = {
+  	{"*", [&]() {return x * y; }},
+  };
+  
+  std::cout << a_map["*"]() << std::endl;
+  ```
+
+  再注：
+
+  ```c++
+  // 但，注：如果是返回的智能指针 std::shared_ptr<int>类型，这种引用捕获还是出错，要写成：
+  std::map<std::string, std::function<std::shared_ptr<int>(int, int)>> a_map = {
+  	{"*", [](int i, int j) {return std::make_shared<int>(i, j); }},    // 这代码是错了，只是为了说明，
+  };
+  ```
+
+  
+
+### 4.2. 正则表达式
 
 ​	C++正则表达式库(RE库)，它是新标准库的一部分，RE库定义在头文件`#include <regex>`中，它包好多个组件库，如下表所示：
 
@@ -1559,7 +1681,7 @@ std::cout << std::regex_replace(number, r, fmt) << std::endl;
 
 ​	用来控制匹配和格式的标志，其类型为match_flag_type,这些值都定义在名为regex_constants的命名空间中，一般的例子：std::regex_constants::format_no_copy  还有一些其它的标志在书上，不写了，用到时去看吧。
 
-### 4.3 随机数
+### 4.3. 随机数
 
 #### 生成随机数技巧
 
@@ -1783,7 +1905,7 @@ Tips：
 
 最后：随机数引擎类一般就是用这一个==std::default_random_engine==，但是随机数分布类有很多种，除了上面写到的常用的几种，还有一些在书上右上角标的第781页。
 
-### 4.4 异常处理
+### 4.4. 异常处理
 
 ​							<stdexcept\>头文件定义的异常类：
 
@@ -1827,6 +1949,10 @@ Tips：
 #include <stdexcept>    
 if (a == b) {
 	throw std::runtime_error("这是一个错误抛出");
+}
+// 后续还看到过这样的用法，直接throw抛出
+if (srcImage.empty()) {
+    throw "[ERROR] srcImage empty !";       // 居然可以直接这样抛出
 }
 ```
 
@@ -1985,7 +2111,7 @@ public:
 
 ​	就是把异常捕获放进构造函数，下面是伪代码，格式大致是：
 
-```
+```c++
 template <typename T>
 Blod<T>::Blod(std::initializer_list<T> li) try : data(std::make_shared<T> (li)) {
 	/*  空函数体   */
@@ -1994,7 +2120,7 @@ Blod<T>::Blod(std::initializer_list<T> li) try : data(std::make_shared<T> (li)) 
 
 ​	注意：关键字try出现在表示构造函数初始值列表的冒号以及表示函数体的花括号之前。与这个try关联的catch既能处理构造函数体抛出的异常，也能处理成员初始化列表抛出的异常。
 
-### 4.5 命名空间
+### 4.5. 命名空间
 
 ==定义==：以下就定义了一个名为 cplusplus_primer 的命名空间，包含三个成员：两个类和一个重载的+运算符。
 
@@ -2104,7 +2230,7 @@ void func() {
 
 总之少用using指示吧，但在命名空间本身的实现文件中可以使用using指示，这样会比较方便。
 
-### 4.6 union类
+### 4.6. union类
 
 ​	==联合(union)==是一种特殊的类：一个union可以有多个数据成员，但是在==任意时刻只有一个数据成员可以有值==，当给union的某个成员赋值后，该union的其它成员就变成了未定义的状态了。(是一种节省空间的类)
 ​	union可以为其成员指定public、protected和private等保护标记。默认情况下，union的成员都是公有的，这一点与struct相同。
@@ -2147,7 +2273,7 @@ ival = 42;          // 该对象当前保存的值是42
 
 在匿名union的定义所在的作用域内该union的成员都是可以直接访问的（跟不限定作用域的枚举成员访问有些像）
 
-### 4.7 固有的不可移植的特性
+### 4.7. 固有的不可移植的特性
 
 ​	介绍C++从C语言继承而来的另外两种==不可移植的特性==：==位域==和==volatile限定符==。另外还介绍==链接指示==，它是c++新增的一种不可移植的特性。
 
@@ -2304,7 +2430,7 @@ extern "C" void print(int);
 
 所以，在一组重载函数中有一个是C函数，则其余的必定都是C++函数
 
-### 4.8 位运算符
+### 4.8. 位运算符
 
 | 运算符    | 功能          | 用法                              |
 | --------- | ------------- | --------------------------------- |

@@ -1,7 +1,8 @@
 ## 01. static
 
 - static ==修饰的局部变量只执行初始化一次==，而且延长了局部变量的生命周期，直到程序运行结束以后才释放；（想一下imgui，它很多控制窗口开关的bool值都是在循环中定义的，用的static，而不是在循环外定义的全局变量）
-- static 修饰全局变量的时候，这个全局变量只能在本文件中访问，不能在其它文件中访问，即便是 extern 外部声明也不可以；（即将变量的作用域限定在当前文件中，其它文件无法访问）
+- static 修饰全局变量的时候，这个全局变量只能在本文件中访问，不能在其它文件中访问，即便是 extern 外部声明也不可以；（即将变量的作用域限定在当前文件中，其它文件无法访问（在写rk3588时，即使访问了，变量在这个文件被修改了，另一个文件读取还是没变，是有问题的)）
+  - 写rk3588时，每个client_*.cpp里的 keepRunning 变量，都要加static，不然到了main.cpp里，就是同一个变量被反复定义了。
 - static 修饰一个函数，则这个函数的只能在本文件中调用，不能被其他文件调用。static 修饰的变量存放在全局数据区的静态变量区，包括全局静态变量和局部静态变量，都在全局数据区分配内存。==初始化的时候自动初始化为`0`==；  // 这就是想这个函数只为本文件服务，当本文件被其它文件调用时，不要使用此关键字
 - 不想被释放的时候，可以使用static修饰。比如修饰函数中存放在栈空间的数组。如果不想让这个数组在函数调用结束释放可以使用 static 修饰；
 - 考虑到数据安全性（当程序想要使用全局变量的时候应该先考虑使用 static）；
@@ -213,6 +214,15 @@ namespace fs = std::filesystem;
 #endif
 ```
 
+在使用rk3588时，遇到过这两种方式都是OK的，详见“GCC编译器.md”中的4.2.13 add_definitions
+
+```c++
+// 方式一： #ifdef BUILD_VIDEO_RTSP    // 也是ok的，应该是两种写法
+#if defined(BUILD_VIDEO_RTSP)        // 这就是是那个CMakeLists.txt中的定义，（方式二）
+#include "mk_mediakit.h"
+#endif
+```
+
 
 
 ## 06. extern
@@ -302,7 +312,7 @@ constexpr int sz = get_size();   // 只有当get_size()是一个constexpr函数�
 
   ```c++
   constexpr int new_sz() { return 42; }
-  constexpr int foo = new)sz();   // OK,foo是一个常量表达式
+  constexpr int foo = new_sz();   // OK,foo是一个常量表达式
   ```
 
 ***

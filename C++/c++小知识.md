@@ -432,7 +432,7 @@ int main() {
     // 字符串型数字转int数字核心是下满几行
 	// 这个还必须这么用  （必须导入上面的 <sstream> ）
 	std::stringstream ss;  // 实例化对象 //这里还可以用 istringstream 这个类
-	ss << num1;    // ss.str(); 打印的就是 num1的值
+	ss << num1;    // ss.str(); 打印的就是 num1的值   （还是c++的容器字符串，ss.str().c_str()就是const char* 了）
 	ss >> x;    // 还可以这么写  stringstream ss(num1); ss >> x;
     // 还可以重置这个ss对象，方便后面继续使用
     ss.str("");   // 这样之后ss就回到最初空的状态，无论前面ss里是啥值(就把上面的num1的值清除了)。同样的ss.str("hello"),那么此刻ss中的内容就是hello了，
@@ -521,7 +521,7 @@ std::string s = std::to_string(i);  // 整形转字符串
 double num = std::stod(s);  //40
 
 std::string s1("3.14aa");
-double num = std::stod(s1);  // 3.14
+double num = std::stod(s1);  // 3.14  // 字符串转浮点型
 ```
 
 - int转成string用的是std::to_string();
@@ -589,6 +589,17 @@ inline bool strToLong(const std::string &value, long &result) {
 }
 ```
 
+#### 传入的参数从string到bool
+
+有时候，传参进来时 --use true 或是 --use flase
+
+```c++
+bool USE = false;   // 可以先初始化一下
+// 要把传进来的 --use 的值赋值给变量 USE, 假设传进来的参数都已经存到 std::map<std::string, std::string> arguments; 中了，然后，arg就是我们要的这对键值对， 那么处理就是
+# include <sstream>       // std::boolalpha 在1 c++基础.md中详细说明
+std::istringstream(arg.second) >> std::boolalpha >> USE;
+```
+
 ## 05. 类似 time.sleep
 
 ```c++
@@ -609,16 +620,23 @@ std::this_thread::sleep_for(std::chrono::milliseconds(1000));   // 除了millise
 
 ```c++
 #include <chrono>    // 需要这个头文件
-// 0.0 统计用时
+// 0.0 统计用时（1）
 auto start = std::chrono::high_resolution_clock::now();
 Sleep(1000);   // 这是window上才能用的，需要上面的#include <Windows.h>头文件
 auto end = std::chrono::high_resolution_clock::now();
 std::cout << "用时：" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+// 统计时间(2),在“SegmentAnything-OnnxRunner”这个项目还看到这样写
+std::chrono::duration<double> diff = end - start;
+std::cout << "Cost time: " << diff.count() << "s" << std::endl;  // cost time: 2.45163s
+
+// *****************************************************************************
 
 // 1.0 获取unix毫秒级时间戳（ms的格式是  std::chrono::milliseconds  ）
 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>			  (std::chrono::system_clock::now().time_since_epoch());
 std::cout << ms.count()  << std::endl;
 // 其中，std::chrono::system_clock::now()函数获取当前时间，返回一个std::chrono::time_point类型的对象。
+
+// ***************************************************************************
 
 // 注：在vs中会说localtime函数不安全
 // 2.0 时间戳格式化到现在（接着1.0）
@@ -630,6 +648,7 @@ std::cout << "Current time: " << str << '\n';  // 2023-03-08 03:24:39
 // 所以改进用 localtime_s 函数
 std::tm time_info{};  // 注：使用 localtime_s 函数时，需要将 tm 结构体初始化为零
 std::time_t timestamp = std::time(nullptr);
+// localtime_s只在vs上才有
 errno_t err = localtime_s(&time_info, &timestamp);     // errno_t是win才有的，linux没有
 if (err) {  // 如果转换失败，该函数会返回一个非零的错误码
     std::cout << "Failed to convert timestamp to time\n";
@@ -688,6 +707,30 @@ void printTime() {
 }
 ```
 
+---
+
+当前本地时间戳的格式化：（上面有讲的比较细，这里总结一下）
+
+- linux
+
+  ```c++
+  #include <iostream>
+  #include <ctime>
+  
+  int main() {
+      std::tm time_info{};
+      std::time_t timestamp = std::time(nullptr);
+      
+      char time_str[20]{};
+      // 其它格式化样式 "%Y-%m-%d %H:%M:%S"
+      strftime(time_str, sizeof(time_str),"%Y%m%d_%H.%M", std::localtime(&timestamp));
+      std::cout << time_str << std::endl;
+      return 0;
+  }
+  ```
+
+  注：win下，用 localtime_s 替换掉 std::localtime 即可。
+
 ## 06. exit(0)
 
 ​	c++程序在执行到这里的时候就会退出，exit(int_Code);里面必须要给一个int状态码，一般给0，然后程序结束后`echo $?`得到的就是0，代表正常；若是exit(-1)，程序结束后得到的就是255,代表异常，自己拿捏
@@ -736,21 +779,50 @@ std::cout << s1 << std::endl;  // 把字母都变成大写了
 
 > ​				表3.3:cctype头文件中的函数（c只能是字符）
 >
-> - isalnum(c)    // 当c是字母或数字时为真
+> - std::isalnum(c)    // 当c是字母或数字时为真
 >
-> - isalpha(c)    // 当c是字母时为真
-> - iscntrl(c)     // 当c是控制字符时为真
-> - isdigit(c)    // 当c是数字时为真
-> - isgraph(c)    // 当c不是空格但可打印时为真
-> - islower(c)    // 当c是小写字母时为真
-> - isprint(c)    // 当c是可打印字符时为真（即c是空格或c具有可视形式)
-> - ispunct(c)   // 当c是标点符号时为真(即c不是控制字符、数字、字母、可打印空白中的一种)
-> - isspace(c)     // 当c是空白时为真（即c是空格、横向制表符、纵向制表符、回车符、换行符、进纸符中的一种)
-> - isupper(c)     // 当c是大写字母时为真
-> - isxdigit(c)    // 当c是十六进制数字时为真
-> - tolower(c)    // 如果c是大写字母，输出对应的小写字母:否则原样输出c
-> - toupper(c)    // 如果c是小写字母，输出对应的大写字母;否则原样输出c
-> - isblank(c)    // 字符c是空格(好像跟上面isspace一样的)
+> - std::isalpha(c)    // 当c是字母时为真
+>
+> - std::iscntrl(c)     // 当c是控制字符时为真
+>
+> - std::isdigit(c)    // 当c是数字时为真
+>
+> - std::isgraph(c)    // 当c不是空格但可打印时为真
+>
+> - std::islower(c)    // 当c是小写字母时为真
+>
+> - std::isprint(c)    // 当c是可打印字符时为真（即c是空格或c具有可视形式)
+>
+> - std::ispunct(c)   // 当c是标点符号时为真(即c不是控制字符、数字、字母、可打印空白中的一种)
+>
+> - ==std::isspace(c)==     // 当c是空白时为真（即c是空格、横向制表符、纵向制表符、回车符、换行符、进纸符中的一种)（用来去除空格）
+>
+>   - ```c++
+>     std::vector<std::string> classNames;
+>     // 一行一个类的名字，有些类万一中间有空格，就会有问题，这里把空格去掉
+>     std::ifstream ifs("C:\\Users\\Administrator\\Downloads\\toolsTable.txt");
+>     if (ifs.is_open()) {
+>     	std::string line;
+>     	while (std::getline(ifs, line)) {
+>     		std::string temp;
+>     		std::copy_if(line.cbegin(), line.cend(), std::back_inserter(temp),
+>     			[](const char c) { return !std::isspace(c);  });
+>
+>     		classNames.push_back(temp);
+>     	}
+>     	ifs.close();
+>     }
+>     ```
+>
+> - std::isupper(c)     // 当c是大写字母时为真
+>
+> - std::isxdigit(c)    // 当c是十六进制数字时为真
+>
+> - std::tolower(c)    // 如果c是大写字母，输出对应的小写字母:否则原样输出c
+>
+> - std::toupper(c)    // 如果c是小写字母，输出对应的大写字母;否则原样输出c
+>
+> - std::isblank(c)    // 字符c是空格(好像跟上面isspace一样的)
 
 ## 08. sizeof()跟strlen()的区别
 
@@ -892,9 +964,9 @@ if (std::cin.eof()) {
 
 ==在win下使用vs的while(std::cin >> a_str)，要让它结束控制台的输入，按下ctrl+z再回车就行==。
 
-## 11. system()
+## 11. system() getchar()
 
-此函数不仅仅是在vs中可以用，在linux下也是可用的，它代表直接调用给的shell命令，好比：（这会把那个shell了命令执行的结果打印到控制套）
+system(): 此函数不仅仅是在vs中可以用，在linux下也是可用的，它代表直接调用给的shell命令，好比：（这会把那个shell了命令执行的结果打印到控制套）
 
 ```c++
 #include <iostream>       // 这个是需要这个头文件的
@@ -906,6 +978,27 @@ int main() {
 ```
 
 所以在linux下system("clear");也是可用的。
+
+---
+
+getchar(): 这个是头文件#include \<stdio.h> 中的一个函数，当程序执行到这里时会卡住，然后按回车就可以进到下一步了，所以可以用来替代system("pause");
+
+```c++
+#include <stdio.h>
+int main() {
+	getchar();   // 程序到这里就会卡住，按回车就会到下一步
+	std::cout << "hello world" << std::endl;
+	return 0;
+}
+```
+
+它也是有返回值的，接收用户一个字符的输入，然后回车确认，即：
+
+```c++
+int signal = getchar();
+if ((cahr) singal == 'q') {/* do something*/}
+else if ((char) signal == 'c') {/* do something */} 
+```
 
 ## 12. 数组引用的问题
 
@@ -1171,13 +1264,12 @@ linux：
 #include <dirent.h>  // linux独有的吧
 #include <cstring>
 
-void getFileName(const char* path, std::vector<std::string> &files) {
-    //  是头文件<dirent.h>的类型
-    DIR *pDir = opendir(path);   // path是string的话，要path.c_str()
-    if ((pDir == nullptr) return;  
-        
-    struct dirent *ptr == nullptr;  // opendir、readdir这些都是头文件dirent.h
-    while ((ptr = readdir(pDir)) != nullptr) {
+void getFileName(std::string path, std::vector<std::string> &files) {
+    DIR *pDir;   //  是头文件<dirent.h>的类型
+    struct dirent *ptr;  // opendir、readdir这些都是头文件dirent.h
+    if (!(pDir = opendir(path.c_str()))) return;   // 当路径不存在时，这里就会返回
+            
+    while ((ptr = readdir(pDir)) != 0) {
         // strcmp是C语言里的，只导入string,然后std::strcmp都是没有的，要<cstring>
         // 功能是比较这两个字符串是否相同，相同就会返回0，不同就是非0
         if (strcmp(ptr->d_name, ".") != 0 && strcmp(ptr->d_name, "..") != 0) {
@@ -1188,10 +1280,10 @@ void getFileName(const char* path, std::vector<std::string> &files) {
 }
 
 int main(int argc, char* argv[]) {
-    std::string file_path = "/home/songhui/123";
+    std::string file_path = "/home/songhui/1_video";
     std::vector<std::string> files_name;
 
-    GetFileName(file_path, files_name);
+    getFileName(file_path, files_name);
 
     for (auto iter = files_name.cbegin(); iter != files_name.cend(); ++iter) {
         std::cout << *iter << std::endl;
@@ -1292,85 +1384,153 @@ int main() {
 }
 ```
 
-## 19. getchar()
+## 19. 格式化接收的参数&&验证文件是否存在，建文件夹
 
-​	这个是头文件#include \<stdio.h> 中的一个函数，当程序执行到这里时会卡住，然后按回车就可以进到下一步了，所以可以用来替代system("pause");
+现在这种参数格式化，现在看到比较好的有三种处理方式：
+
+- 在[c++常用库.md](./C++常用库.md)的“10. args 参数解析库”中， 还有一个类似于python的args库，也是header-only。
+- 练习onnxrunner时，用map容器来处理传入参数，[代码](https://github.com/nianjiuhuiyi/Study/blob/master/onnx/main.cpp#L37)；
+- 下面这里是用的opencv里的类来实现的，之前还在点云PCL库学习时，看到里面有过这种类似的。
 
 ```c++
-#include <stdio.h>
-int main() {
-	getchar();   // 程序到这里就会卡住，按回车就会到下一步
-	std::cout << "hello world" << std::endl;
-	return 0;
+#include <opencv2/opencv.hpp>
+#include <sys/stat.h>  // 结构体stat、函数stat、mkdir、S_IRWXU 这些需要； vs有这头文件，但好像没有mkdir这函数
+#include <unistd.h>   //  access、 F_OK 这些需要；这在 vs中是没有的
+
+/*
+使用实例：
+a.out  --input=../datasets/test_images --bmodel=../BM1684/yolov5m6.bmodel --dev_id=0 --conf_thresh=0.5 --nms_thresh=0.5 --classnames=../datasets/coco.names
+
+a.out --help  // 就能把对应参数使用说明打印出来
+*/
+
+int main(int argc, char** argv) {
+    // 设置浮点数就正常显示，而不是以科学计数法来表示。（1c++基础.md中有更多的使用）
+    std::cout.setf(std::ios::fixed);
+    
+	const char *keys = "{bmodel | ../../models/BM1684/yolov5s_v6.1_3output_fp32_1b.bmodel | bmodel file path}"
+		"{dev_id | 0 | TPU device id}"
+		"{conf_thresh | 0.001 | confidence threshold for filter boxes}"
+		"{nms_thresh | 0.6 | iou threshold for nms}"
+		"{help | 0 | print help information.}"
+		"{input | ../../datasets/test | input path, images direction or video file path}"
+		"{classnames | ../../datasets/coco.names | class names file path}"
+		"{use_cpu_opt | false | accelerate cpu postprocess}";   // 这里直接换行，不需要特殊的符号（中间的默认值非必须）
+    
+    // 1、这样就拿到了传进来的参数（它不会检验传递的key对不对，如果传递的key不对，这里就会用默认值）
+    cv::CommandLineParser parser(argc, argv, keys);
+	if (parser.get<bool>("help")) {
+		parser.printMessage();
+		return 0;
+	}
+    std::string bmodel_file = parser.get<std::string>("bmodel");
+	std::string input = parser.get<std::string>("input");
+	int dev_id = parser.get<int>("dev_id");
+	bool use_cpu_opt = parser.get<bool>("use_cpu_opt");
+    
+    // 2、check params （检查传的文件、文件夹路径是否存在，在1c++基础.md中，用的是文件读写，然后调用 .good()或是.is_open()来判断的，不是特别好。）
+    struct stat info;    // struct stat, 以及下面的，需要头文件 #include <sys/stat.h>
+	if (stat(bmodel_file.c_str(), &info) != 0) {
+    	std::cout << "Cannot find valid model file." << std::endl;
+    	exit(1);
+  	}
+    if (stat(input.c_str(), &info) != 0){     // input参数给的是一个文件夹路径（这也是检查文件夹是否存在）
+    	std::cout << "Cannot find input path." << std::endl;
+    	exit(1);
+  	}
+    // 在拿去input这个文件夹里的图片时，可以先判断一下这个文件夹(不是必须，就是把这种放这里)
+    if (info.st_mode & S_IFDIR) {
+    	// 然后这里用 18.获取文件夹里的文件来拿到所有图片的路径。
+        // 或者用 OpenCV_C++版.md中用 cv::glob 来拿取所有图片的路径
+    }
+    
+    // 3、检查文件夹路径是否存在，不存在去创建 
+    // 3.1 这在linux下OK，vs中不行，注意它需要的头文件（不能递归创建文件夹，得一个个来）
+    if (access("results", 0) != F_OK)
+    	mkdir("results", S_IRWXU);
+  	if (access("results/images", 0) != F_OK)
+   	 	mkdir("results/images", S_IRWXU);
+    // 3.2 使用c++17的新特性（vs、linux都可以用, -std=c++17） // 要头文件  #include<filesystem>
+    // （centos用可能就会莫名其妙的出现 Segmentation fault，可能g++版本低了），vs2022、ubunut22.04都是OK的
+    std::string save_dir = "./output/V02";   // 多级路径，单级路径都能创建
+    try {
+    	if (!std::filesystem::exists(save_dir)) {
+        	std::filesystem::create_directories(save_dir);
+        }
+    }
+    catch (const std::filesystem::filesystem_error &e) {
+    	std::cout << "[ERROR] Error creating or checking folder: " << e.what() << std::endl;
+    }
 }
 ```
 
-它也是有返回值的，接收用户一个字符的输入，然后回车确认，即：
+关于cv::CommandLineParser,下面是它自带的文档:
+
+- 通过 @来指定位置参数；位置参数可以用 parser.get\<String\>(0)传索引的方式, 或get\<String\>("@image1")这种方式都可以
+- "{help h usage ? |      | print this message   }"，传参 -h --help --? -? -usage 都是可以的，然后if (parser.get\<bool\>("usage")),代码里无论是写的help还是usage都是可以的。
 
 ```c++
-int signal = getchar();
-if ((cahr) singal == 'q') {/* do something*/}
-else if ((char) signal == 'c') {/* do something */} 
+/*
+### Keys syntax
+
+The keys parameter is a string containing several blocks, each one is enclosed in curly braces and
+describes one argument. Each argument contains three parts separated by the `|` symbol:
+
+-# argument names is a space-separated list of option synonyms (to mark argument as positional, prefix it with the `@` symbol)
+-# default value will be used if the argument was not provided (can be empty)
+-# help message (can be empty)
+
+For example:
+
+@code{.cpp}
+    const String keys =
+        "{help h usage ? |      | print this message   }"
+        "{@image1        |      | image1 for compare   }"
+        "{@image2        |<none>| image2 for compare   }"
+        "{@repeat        |1     | number               }"
+        "{path           |.     | path to file         }"
+        "{fps            | -1.0 | fps for output video }"
+        "{N count        |100   | count of objects     }"
+        "{ts timestamp   |      | use time stamp       }"
+        ;
+}
+@endcode
+
+Note that there are no default values for `help` and `timestamp` so we can check their presence using the `has()` method.
+Arguments with default values are considered to be always present. Use the `get()` method in these cases to check their
+actual value instead.
+
+String keys like `get<String>("@image1")` return the empty string `""` by default - even with an empty default value.
+Use the special `<none>` default value to enforce that the returned string must not be empty. (like in `get<String>("@image2")`)
+
+### Usage
+
+For the described keys:
+
+@code{.sh}
+    # Good call (3 positional parameters: image1, image2 and repeat; N is 200, ts is true)
+    $ ./app -N=200 1.png 2.jpg 19 -ts
+
+    # Bad call
+    $ ./app -fps=aaa
+    ERRORS:
+    Parameter 'fps': can not convert: [aaa] to [double]
+@endcode
+ */
+// 不知道咋回事，我乱传参数，还是无法进到这个判断里，即始终认为是正确的
+if (!parser.check()) {
+    parser.printErrors();
+    return 0;
+}
 ```
 
 ## 20. 多线程demo
 
 opencv的一个多线程demo去看[OpenCV_C++版.md](../opencv/OpenCV_C++版.md)。
 
-### 1、c++的生产\消费者	
-
-​	当处理速度跟不上读帧速度，就会积压，就可以考虑用多线程，当读取数据的队列中有积压时就用新的数据替换掉老的数据。
-
-```c++
-#include <iostream>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-
-std::mutex mtx;
-std::condition_variable cv;
-int buffer = 0;
-bool ready = false;
-
-void prodecer() {
-	for (int i = 0; i < 5; i++) {
-		std::unique_lock<std::mutex> lock(mtx);
-		buffer = i + 1;
-		ready = true;
-		cv.notify_one();
-		std::cout << "Producer: Produced " << buffer << std::endl;
-		lock.unlock();
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-	}
-}
-void consumer() {
-	int data = 0;
-	for (int i = 0; i < 5; i++) {
-		std::unique_lock<std::mutex> lock(mtx);
-		cv.wait(lock, [] {return ready; });
-		data = buffer;
-		ready = false;
-		std::cout << "Consumer: Consumed " << data << std::endl;
-		lock.unlock();
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-	}
-}
-
-int main() {
-	std::thread t1(prodecer);
-	std::thread t2(consumer);
-	t1.join();
-	t2.join();
-	system("pause");
-	return 0;
-}
-```
-
-说明：这个示例包含两个线程，一个生产者和一个消费者。生产者生成一些数据，并将其存储在共享缓冲区中。然后通知消费者可以读取数据。消费者在读取数据之前等待通知。一旦生产者通知消费者可以读取数据，消费者从共享缓冲区中读取数据。在这个示例中，使用互斥锁来保护共享资源，使用条件变量来同步线程的执行。这表明生产者生成数据并将其存储在共享缓冲区中，而消费者等待生产者通知并读取数据。
-
 ### 2、海康相机的示例
 
-​	它这就是通过按enter来结束进程，然后也是在主线程中用while循环来卡住主线程。
+​	它这就是通过按enter来结束进程，然后也是在主线程中用while循环来卡住主线程。（应该是C的多线程）
 
 ```c++
 #include <stdio.h>
@@ -1446,6 +1606,10 @@ static void* WorkThread(void* pUser) {
         nRet = MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 1000);
         auto end = std::chrono::high_resolution_clock::now();
         std::cout << "用时: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms" << std::endl;
+        /* 其它地方看的写法，放这吧（这就只能得到s，耗时很长的才用这吧）
+        	std::chrono::duration<double> diff = end - start;
+        	std::cout << "Cost time : " << diff.count() << "s" << std::endl;
+        */
 
         if (nRet == MV_OK) {
             // printf("GetOneFrame, Width[%d], Height[%d], nFrameNum[%d]\n", 
@@ -1621,3 +1785,278 @@ std::tm time_info{};
 具体去看[3c++提高编程.md](./3 c++提高编程.md)中“5.5.1 accumulate”中实现。
 
 然后要实现python中的map()函数对列表了每个函数做一系列操作，可以去看“5.1.2 transform”
+
+## 23. 格式化代码clang-format
+
+ubuntu安装：sudo apt install clang-format  # 作为命令行使用
+
+参考：每个参数说明，怎么生成，[教程1](https://blog.csdn.net/Lucy_stone/article/details/135184576)。[这个](https://www.cnblogs.com/baiweituyou/p/17582013.html)也放这里参考吧。
+
+基本使用：
+
+- clang-format --version
+- clang-format -i main.cp
+
+格式化指定路径下所有c++代码的脚本，"format.sh"：
+
+```shell
+#!/usr/bin/env bash
+
+# 指定文件夹路径
+DIR="./src"
+
+# 这里还可以添加其它类型的文件
+find $DIR -name '*.cpp' -o -name '*.h' -o -name "*.hpp" | while read -r file
+do
+    clang-format -i "$file"
+done
+```
+
+这个脚本的执行路径里一般要有一个说明自己要格式化的说明文件，“.clang-format” ： # 非必须，下面是我现在在用的，然后带有“# my”的是我自己在默认上修改了的，每个设置的说明，在[教程1](https://blog.csdn.net/Lucy_stone/article/details/135184576)都是有说明。
+
+```
+---
+Language:        Cpp
+BasedOnStyle:  LLVM
+
+AccessModifierOffset: -4
+AlignAfterOpenBracket: BlockIndent
+AlignArrayOfStructures: Left
+AlignConsecutiveMacros: None
+AlignConsecutiveAssignments: None
+AlignConsecutiveBitFields: None
+AlignConsecutiveDeclarations: None
+AlignEscapedNewlines: Right
+AlignOperands:   Align
+AlignTrailingComments: true
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortEnumsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: All
+AllowShortLambdasOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: MultiLine
+AttributeMacros:
+  - __capability
+BinPackArguments: true
+BinPackParameters: true
+BraceWrapping:
+  AfterCaseLabel:  false
+  AfterClass:      false
+  AfterControlStatement: Never
+  AfterEnum:       false
+  AfterFunction:   false
+  AfterNamespace:  false
+  AfterObjCDeclaration: false
+  AfterStruct:     false
+  AfterUnion:      false
+  AfterExternBlock: false
+  BeforeCatch:     true         # my
+  BeforeElse:      true        # my  让 else if 另起一行
+  BeforeLambdaBody: false
+  BeforeWhile:     false
+  IndentBraces:    false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+BreakBeforeBinaryOperators: None
+BreakBeforeConceptDeclarations: true
+# BreakBeforeBraces: Attach
+BreakBeforeBraces: Custom  # 这样BraceWrapping里面才会生效
+BreakBeforeInheritanceComma: false
+BreakInheritanceList: BeforeColon
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializersBeforeComma: false
+BreakConstructorInitializers: BeforeColon
+BreakAfterJavaFieldAnnotations: false
+BreakStringLiterals: true
+ColumnLimit:     0    # my
+CommentPragmas:  '^ IWYU pragma:'
+QualifierAlignment: Leave
+CompactNamespaces: false
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: true
+DeriveLineEnding: true
+DerivePointerAlignment: false
+DisableFormat:   false
+EmptyLineAfterAccessModifier: Never
+EmptyLineBeforeAccessModifier: LogicalBlock
+ExperimentalAutoDetectBinPacking: false
+PackConstructorInitializers: BinPack
+BasedOnStyle:    ''
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+AllowAllConstructorInitializersOnNextLine: true
+FixNamespaceComments: true
+ForEachMacros:
+  - foreach
+  - Q_FOREACH
+  - BOOST_FOREACH
+IfMacros:
+  - KJ_IF_MAYBE
+IncludeBlocks:   Preserve
+IncludeCategories:
+  - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
+    Priority:        2
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^(<|"(gtest|gmock|isl|json)/)'
+    Priority:        3
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '.*'
+    Priority:        1
+    SortPriority:    0
+    CaseSensitive:   false
+IncludeIsMainRegex: '(Test)?$'
+IncludeIsMainSourceRegex: ''
+IndentAccessModifiers: false
+IndentCaseLabels: false
+IndentCaseBlocks: false
+IndentGotoLabels: true
+IndentPPDirectives: None
+IndentExternBlock: AfterExternBlock
+IndentRequires:  false
+IndentWidth:     4   # 缩进宽度
+IndentWrappedFunctionNames: false
+InsertTrailingCommas: None
+JavaScriptQuotes: Leave
+JavaScriptWrapImports: true
+KeepEmptyLinesAtTheStartOfBlocks: true
+LambdaBodyIndentation: Signature
+MacroBlockBegin: ''
+MacroBlockEnd:   ''
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+ObjCBinPackProtocolList: Auto
+ObjCBlockIndentWidth: 2
+ObjCBreakBeforeNestedBlockParam: true
+ObjCSpaceAfterProperty: false
+ObjCSpaceBeforeProtocolList: true
+PenaltyBreakAssignment: 2
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakOpenParenthesis: 0
+PenaltyBreakString: 1000
+PenaltyBreakTemplateDeclaration: 10
+PenaltyExcessCharacter: 1000000
+PenaltyReturnTypeOnItsOwnLine: 60
+PenaltyIndentedWhitespace: 0
+PointerAlignment: Right
+PPIndentWidth:   -1
+ReferenceAlignment: Pointer
+ReflowComments:  true
+RemoveBracesLLVM: false
+SeparateDefinitionBlocks: Leave
+ShortNamespaceLines: 1
+SortIncludes:    Never   # my 不去改变头文件的排序
+SortJavaStaticImport: Before
+SortUsingDeclarations: true
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeParensOptions:
+  AfterControlStatements: true
+  AfterForeachMacros: true
+  AfterFunctionDefinitionName: false
+  AfterFunctionDeclarationName: false
+  AfterIfMacros:   true
+  AfterOverloadedOperator: false
+  BeforeNonEmptyParentheses: false
+SpaceAroundPointerQualifiers: Default
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles:  Never
+SpacesInConditionalStatement: false
+SpacesInContainerLiterals: true
+SpacesInCStyleCastParentheses: false
+SpacesInLineCommentPrefix:
+  Minimum:         1
+  Maximum:         -1
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceBeforeSquareBrackets: false
+BitFieldColonSpacing: Both
+Standard:        Latest
+StatementAttributeLikeMacros:
+  - Q_EMIT
+StatementMacros:
+  - Q_UNUSED
+  - QT_REQUIRE_VERSION
+TabWidth:        8
+UseCRLF:         false
+UseTab:          Never
+WhitespaceSensitiveMacros:
+  - STRINGIZE
+  - PP_STRINGIZE
+  - BOOST_PP_STRINGIZE
+  - NS_SWIFT_NAME
+  - CF_SWIFT_NAME
+...
+
+
+```
+
+## 24. 处理中断信号
+
+每次直接ctrl+c或者kill程序时，特别是服务，或是一直跑的程序，程序是无法安全退出的，就要用上信号机制。
+
+这在rk3588上写受电弓代码、写语音识别代码都用到了，这里简单再写一下。（cpp-httplib库的demo里也写到了）
+
+```c++
+#include <iostream>
+#include <thread>
+#include <atomic>
+#include <csignal>   // 要这个头文件
+
+static std::atomic<bool> keepRuning(true);
+
+static void signalHandler(int signum) {
+    std::cout << "Interrupt signal ({" << signum << "}) received.") << std::endl;
+    keepRuning.exchange(false);
+    // 这里可以添加更多清理代码，比如等待线程结束等
+}
+
+
+void run_server() {
+    while (keepRuning) {
+    	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
+int main() {
+	// 注册信号处理程序 （ std::signal 也是一个意思 ）(这样就能让程序完全正常退出)
+    signal(SIGINT, signalHandler);  // ctrl + c
+    signal(SIGTERM, signalHandler);  // kill PID
+    
+	// 模拟的服务线程一直在运行
+	std::thread server_thread(run_server);
+	
+	// 用这种方式来保证主线程一直在运行
+	while (keepRuning) {
+    	std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    
+    if (server_thread.joinable()) {
+        server_thread.join();
+    }
+	std::cout << "已经正常退出." << std::endl;
+	return 0;
+}
+```
+
